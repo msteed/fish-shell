@@ -15,8 +15,13 @@
 //#include "wgetopt.h"
 
 // XXX tests
-// XXX documentation
-// XXX remaining subcommands
+// XXX documentation & help
+// XXX accept -- in all subcommands
+// XXX string_join
+// XXX string_match
+// XXX string_replace
+// XXX string_split
+// XXX string_sub
 
 enum
 {
@@ -57,6 +62,26 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
     return BUILTIN_STRING_OK;
 }
 
+static int string_join(parser_t &parser, int argc, wchar_t **argv)
+{
+    string_fatal_error(_(L"string join: not yet implemented"));
+    return BUILTIN_STRING_OK;
+}
+
+static int string_length(parser_t &parser, int argc, wchar_t **argv)
+{
+    if (argc > 1)
+    {
+        string_fatal_error(_(L"string length: too many arguments"));
+        return BUILTIN_STRING_ERROR;
+    }
+
+    int len = (argc == 0) ? 0 : wcslen(argv[0]);
+
+    append_format(stdout_buffer, L"%d\n", len);
+    return BUILTIN_STRING_OK;
+}
+
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string match: not yet implemented"));
@@ -75,20 +100,6 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     return BUILTIN_STRING_OK;
 }
 
-static int string_length(parser_t &parser, int argc, wchar_t **argv)
-{
-    if (argc > 1)
-    {
-        string_fatal_error(_(L"string length: too many arguments"));
-        return BUILTIN_STRING_ERROR;
-    }
-
-    int len = (argc == 0) ? 0 : wcslen(argv[0]);
-
-    append_format(stdout_buffer, L"%d\n", len);
-    return BUILTIN_STRING_OK;
-}
-
 static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string sub: not yet implemented"));
@@ -103,10 +114,11 @@ static const struct string_subcommand
 string_subcommands[] =
 {
     { L"escape", &string_escape },
+    { L"join", &string_join },
+    { L"length", &string_length },
     { L"match", &string_match },
     { L"replace", &string_replace },
     { L"split", &string_split },
-    { L"length", &string_length },
     { L"sub", &string_sub },
     { 0, 0 }
 };
