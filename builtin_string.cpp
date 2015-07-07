@@ -48,7 +48,12 @@ static void string_fatal_error(const wchar_t *fmt, ...)
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string escape: not yet implemented"));
+    for (int i = 0; i < argc; i++)
+    {
+        wcstring escaped = escape(argv[i], ESCAPE_ALL);
+        append_format(stdout_buffer, L"%ls\n", escaped.c_str());
+    }
+
     return BUILTIN_STRING_OK;
 }
 
