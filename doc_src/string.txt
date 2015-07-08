@@ -1,0 +1,47 @@
+\section string string - manipulate strings
+
+\subsection string-synopsis Synopsis
+\fish{synopsis}
+string length [STRING...]
+string sub [(-s | --start)] [(-e | --end)] [(-l | --length)] STRING
+string split [(-n | --limit)] SEP [STRING...]
+string join SEP [STRING...]
+string escape [STRING...]
+string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
+             [(-n | --index)] [(-q | --query)] PATTERN STRING
+string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
+               PATTERN REPLACEMENT STRING
+\endfish
+
+\subsection string-description Description
+
+`string` performs operations on strings.
+
+The following subcommands are available:
+
+- `length` reports the string length in characters.
+
+- `sub` prints a substring of its string argument.
+
+- `split` splits each string argument on a separator.
+
+- `join` joins its string arguments into a single string.
+
+- `escape` escapes each string argument such that it can be passed back to `eval` to produce the original argument again.
+
+- `match` tests a string against a pattern and prints the matching substring.
+
+- `replace` similar to `match` but replaces matching substrings with a replacement string and prints the result.
+
+
+\subsection string-example Examples
+
+\fish
+string length 'hello, world'
+string sub ...
+string split ...
+string join ...
+string escape ...
+string match ...
+string replace ...
+\endfish

@@ -16,7 +16,6 @@
 
 // XXX tests
 // XXX documentation & help
-// XXX accept -- in all subcommands
 // XXX string_join
 // XXX string_match
 // XXX string_replace
@@ -167,8 +166,14 @@ static int builtin_string(parser_t &parser, wchar_t **argv)
     if (argc <= 1)
     {
         string_fatal_error(_(L"%ls: Expected at least one argument"), argv[0]);
-        // XXX show help
+        builtin_print_help(parser, L"string", stderr_buffer);
         return BUILTIN_STRING_ERROR;
+    }
+
+    if (wcscmp(argv[1], L"-h") == 0 || wcscmp(argv[1], L"--help") == 0)
+    {
+        builtin_print_help(parser, L"string", stderr_buffer);
+        return BUILTIN_STRING_OK;
     }
 
     const string_subcommand *subcmd = &string_subcommands[0];
@@ -179,7 +184,7 @@ static int builtin_string(parser_t &parser, wchar_t **argv)
     if (subcmd->handler == 0)
     {
         string_fatal_error(_(L"%ls: Unknown subcommand '%ls'"), argv[0], argv[1]);
-        // XXX show help
+        builtin_print_help(parser, L"string", stderr_buffer);
         return BUILTIN_STRING_ERROR;
     }
 
