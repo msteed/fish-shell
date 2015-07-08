@@ -53,7 +53,26 @@ static void string_fatal_error(const wchar_t *fmt, ...)
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 {
-    for (int i = 0; i < argc; i++)
+    const wchar_t *short_options = L"";
+    const struct woption long_options[] = { 0, 0, 0, 0 };
+
+    woptind = 0;
+    while (1)
+    {
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        else if (c == '?')
+        {
+            builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+            return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    for (int i = woptind; i < argc; i++)
     {
         wcstring escaped = escape(argv[i], ESCAPE_ALL);
         append_format(stdout_buffer, L"%ls\n", escaped.c_str());
@@ -65,45 +84,61 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 static int string_join(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string join: not yet implemented"));
-    return BUILTIN_STRING_OK;
+    return BUILTIN_STRING_ERROR;
 }
 
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
 {
-    if (argc > 1)
+    const wchar_t *short_options = L"";
+    const struct woption long_options[] = { 0, 0, 0, 0 };
+
+    woptind = 0;
+    while (1)
     {
-        string_fatal_error(_(L"string length: too many arguments"));
-        return BUILTIN_STRING_ERROR;
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        else if (c == '?')
+        {
+            builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+            return BUILTIN_STRING_ERROR;
+        }
     }
 
-    int len = (argc == 0) ? 0 : wcslen(argv[0]);
+    for (int i = woptind; i < argc; i++)
+    {
+        int len = wcslen(argv[i]);
+        append_format(stdout_buffer, L"%d\n", len);
+    }
 
-    append_format(stdout_buffer, L"%d\n", len);
     return BUILTIN_STRING_OK;
 }
 
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string match: not yet implemented"));
-    return BUILTIN_STRING_OK;
+    return BUILTIN_STRING_ERROR;
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string replace: not yet implemented"));
-    return BUILTIN_STRING_OK;
+    return BUILTIN_STRING_ERROR;
 }
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string split: not yet implemented"));
-    return BUILTIN_STRING_OK;
+    return BUILTIN_STRING_ERROR;
 }
 
 static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string sub: not yet implemented"));
-    return BUILTIN_STRING_OK;
+    return BUILTIN_STRING_ERROR;
 }
 
 static const struct string_subcommand
@@ -131,24 +166,24 @@ static int builtin_string(parser_t &parser, wchar_t **argv)
     int argc = builtin_count_args(argv);
     if (argc <= 1)
     {
-        string_fatal_error(_(L"string: not enough arguments"));
+        string_fatal_error(_(L"%ls: Expected at least one argument"), argv[0]);
+        // XXX show help
         return BUILTIN_STRING_ERROR;
     }
 
-    wchar_t *subcmd_arg = argv[1];
-    argc -= 2;
-    argv += 2;
-
     const string_subcommand *subcmd = &string_subcommands[0];
-    while (subcmd->name != 0 && wcscmp(subcmd->name, subcmd_arg) != 0)
+    while (subcmd->name != 0 && wcscmp(subcmd->name, argv[1]) != 0)
     {
         subcmd++;
     }
     if (subcmd->handler == 0)
     {
-        string_fatal_error(_(L"string: unknown subcommand: %ls"), subcmd_arg);
+        string_fatal_error(_(L"%ls: Unknown subcommand '%ls'"), argv[0], argv[1]);
+        // XXX show help
         return BUILTIN_STRING_ERROR;
     }
 
+    argc--;
+    argv++;
     return subcmd->handler(parser, argc, argv);
 }
