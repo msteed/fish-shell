@@ -3,14 +3,14 @@
 \subsection string-synopsis Synopsis
 \fish{synopsis}
 string length [STRING...]
-string sub [(-s | --start)] [(-e | --end)] [(-l | --length)] STRING
+string sub [(-s | --start)] [(-e | --end)] [(-l | --length)] [STRING...]
 string split [(-n | --limit)] SEP [STRING...]
 string join SEP [STRING...]
 string escape [STRING...]
 string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
-             [(-n | --index)] [(-q | --query)] PATTERN STRING
+             [(-n | --index)] [(-q | --query)] PATTERN [STRING...]
 string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
-               PATTERN REPLACEMENT STRING
+               PATTERN REPLACEMENT [STRING...]
 \endfish
 
 \subsection string-description Description
@@ -19,9 +19,9 @@ string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
 
 The following subcommands are available:
 
-- `length` reports the string length in characters.
+- `length` reports the length of each string argument in characters.
 
-- `sub` prints a substring of its string argument.
+- `sub` prints a substring of each string argument.
 
 - `split` splits each string argument on a separator.
 
@@ -29,7 +29,7 @@ The following subcommands are available:
 
 - `escape` escapes each string argument such that it can be passed back to `eval` to produce the original argument again.
 
-- `match` tests a string against a pattern and prints the matching substring.
+- `match` tests each string against a pattern and prints matching substrings.
 
 - `replace` similar to `match` but replaces matching substrings with a replacement string and prints the result.
 

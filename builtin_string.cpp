@@ -56,7 +56,7 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
     const struct woption long_options[] = { 0, 0, 0, 0 };
 
     woptind = 0;
-    while (1)
+    for (;;)
     {
         int c = wgetopt_long(argc, argv, short_options, long_options, 0);
 
@@ -92,7 +92,7 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
     const struct woption long_options[] = { 0, 0, 0, 0 };
 
     woptind = 0;
-    while (1)
+    for (;;)
     {
         int c = wgetopt_long(argc, argv, short_options, long_options, 0);
 
@@ -116,15 +116,211 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
     return BUILTIN_STRING_OK;
 }
 
+
+static bool wildcard_match_string(const wchar_t *pattern, const wchar_t *str, bool ignore_case)
+{
+    for (; *str != L'\0'; str++, pattern++)
+    {
+        switch (*pattern)
+        {
+            case L'?':
+                break;
+
+            case L'*':
+                // skip repeated *
+                while (*pattern == L'*')
+                {
+                    pattern++;
+                }
+
+                // * at end matches whatever follows
+                if (*pattern == L'\0')
+                {
+                    return true;
+                }
+
+                while (*str != L'\0')
+                {
+                    if (wildcard_match_string(pattern, str++, ignore_case))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+
+            case L'[':
+            {
+                bool negate = false;
+                if (*++pattern == L'^')
+                {
+                    negate = true;
+                    pattern++;
+                }
+
+                bool match = false;
+                wchar_t strch = ignore_case ? towlower(*str) : *str;
+                wchar_t patch, patch2;
+                while ((patch = *pattern++) != L']')
+                {
+                    if (patch == L'\0')
+                    {
+                        return false; // no closing ]
+                    }
+                    if (*pattern == L'-' && (patch2 = *(pattern + 1)) != L'\0' && patch2 != L']')
+                    {
+                        if (ignore_case ? towlower(patch) <= strch && strch <= towlower(patch2)
+                                        : patch <= strch && strch <= patch2)
+                        {
+                            match = true;
+                        }
+                        pattern += 2;
+                    }
+                    else if (patch == strch)
+                    {
+                        match = true;
+                    }
+                }
+                if (match == negate)
+                {
+                    return false;
+                }
+                pattern--;
+                break;
+            }
+
+            case L'\\':
+                if (*(pattern + 1) != L'\0')
+                {
+                    pattern++;
+                }
+                // fall through
+
+            default:
+                if (ignore_case ? towlower(*str) != towlower(*pattern) : *str != *pattern)
+                {
+                    return false;
+                }
+                break;
+        }
+    }
+    // str is exhausted - it's a match only if pattern is as well
+    while (*pattern == L'*')
+    {
+        pattern++;
+    }
+    return *pattern == L'\0';
+}
+
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string match: not yet implemented"));
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L"ainqr";
+    const struct woption long_options[] =
+    {
+        { L"all", no_argument, 0, 'a'},
+        { L"ignore-case", no_argument, 0, 'i'},
+        { L"index", no_argument, 0, 'n'},
+        { L"query", no_argument, 0, 'q'},
+        { L"regex", no_argument, 0, 'r'},
+        0, 0, 0, 0
+    };
+
+    bool opt_all = false;
+    bool opt_ignore_case = false;
+    bool opt_index = false;
+    bool opt_query = false;
+    bool opt_regex = false;
+    woptind = 0;
+    for (;;)
+    {
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        switch (c)
+        {
+            case 0:
+                break;
+
+            case 'a':
+                opt_all = true;
+                break;
+
+            case 'i':
+                opt_ignore_case = true;
+                break;
+
+            case 'n':
+                opt_index = true;
+                break;
+
+            case 'q':
+                opt_query = true;
+                break;
+
+            case 'r':
+                opt_regex = true;
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+                return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    int result = 1; // no match
+    int i = woptind;
+    wchar_t *pattern = argv[i++];
+    for (; i < argc; i++)
+    {
+        if (opt_regex)
+        {
+            string_fatal_error(_(L"string match --regex: not yet implemented"));
+            return BUILTIN_STRING_ERROR;
+        }
+        else
+        {
+            bool match = wildcard_match_string(pattern, argv[i], opt_ignore_case);
+            if (opt_query)
+            {
+                if (opt_all && !match)
+                {
+                    result = 1;
+                    break;
+                }
+                if (!opt_all && match)
+                {
+                    result = 0;
+                    break;
+                }
+            }
+            else
+            {
+                if (opt_index)
+                {
+                    append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
+                }
+                else if (match)
+                {
+                    append_format(stdout_buffer, L"%ls\n", argv[i]);
+                    result = 0; // at least one match
+                    if (!opt_all)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string replace: not yet implemented"));
+    // use whatever fish uses to match wildcarded strings?
     return BUILTIN_STRING_ERROR;
 }
 
