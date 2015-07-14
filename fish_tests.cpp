@@ -3906,15 +3906,23 @@ static void run_one_string_test(const wchar_t **argv, int expected_rc, const wch
     wcstring &out = stdout_buffer;
     out.clear();
     int rc = builtin_string(parser, const_cast<wchar_t**>(argv));
-    if (rc != expected_rc || out != expected_out)
+    wcstring args;
+    for (int i = 0; argv[i] != 0; i++)
     {
-        wcstring args;
-        for (int i = 0; argv[i] != 0; i++)
-        {
-            args += wcstring(argv[i]) + L' ';
-        }
-        args.resize(args.size() - 1);
-        err(L"Test failed on line %lu: [%ls]", __LINE__, args.c_str());
+        args += escape_string(argv[i], ESCAPE_ALL) + L' ';
+    }
+    args.resize(args.size() - 1);
+    if (rc != expected_rc)
+    {
+        err(L"Test failed on line %lu: [%ls]: expected return code %d but got %d",
+                __LINE__, args.c_str(), expected_rc, rc);
+    }
+    else if (out != expected_out)
+    {
+        err(L"Test failed on line %lu: [%ls]: expected [%ls] but got [%ls]",
+                __LINE__, args.c_str(),
+                escape_string(expected_out, ESCAPE_ALL).c_str(),
+                escape_string(out, ESCAPE_ALL).c_str());
     }
 }
 
@@ -3928,14 +3936,70 @@ static void test_string(void)
     }
     string_tests[] =
     {
-        // string escape
-        { {L"string", L"escape", L"a", 0}, 0, L"a\n" },
-        // string join
-        // string length
-        // string match
-        // string replace
-        // string split
-        // string sub
+        { {L"string", L"escape", L"a", 0},                      0, L"a\n" },
+        { {L"string", L"escape", L"", 0},                       0, L"''\n" },
+        { {L"string", L"escape", L"\a", 0},                     0, L"\\cg\n" },
+        { {L"string", L"escape", L"\"x\"", 0},                  0, L"'\"x\"'\n" },
+        { {L"string", L"escape", L"hello world", 0},            0, L"'hello world'\n" },
+        { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
+
+        // XXX string join
+
+        { {L"string", L"length", L"", 0},                       0, L"0\n" },
+        { {L"string", L"length", L"a", 0},                      0, L"1\n" },
+        { {L"string", L"length", L"\U0002008A", 0},             0, L"1\n" },
+        { {L"string", L"length", L"um", L"dois", L"três", 0},   0, L"2\n4\n4\n" },
+
+        { {L"string", L"match", L"", L"", 0},                   0, L"\n" },
+        { {L"string", L"match", L"?", L"a", 0},                 0, L"a\n" },
+        { {L"string", L"match", L"*", L"", 0},                  0, L"\n" },
+        { {L"string", L"match", L"**", L"", 0},                 0, L"\n" },
+        { {L"string", L"match", L"*", L"xyzzy", 0},             0, L"xyzzy\n" },
+        { {L"string", L"match", L"**", L"plugh", 0},            0, L"plugh\n" },
+        { {L"string", L"match", L"a*b", L"axxb", 0},            0, L"axxb\n" },
+        { {L"string", L"match", L"a??b", L"axxb", 0},           0, L"axxb\n" },
+        { {L"string", L"match", L"-i", L"a??B", L"axxb", 0},    0, L"axxb\n" },
+        { {L"string", L"match", L"a*", L"axxb", 0},             0, L"axxb\n" },
+        { {L"string", L"match", L"*a", L"xxa", 0},              0, L"xxa\n" },
+        { {L"string", L"match", L"*a*", L"axa", 0},             0, L"axa\n" },
+        { {L"string", L"match", L"*a*", L"xax", 0},             0, L"xax\n" },
+        { {L"string", L"match", L"*a*", L"bxa", 0},             0, L"bxa\n" },
+        { {L"string", L"match", L"*a", L"a", 0},                0, L"a\n" },
+        { {L"string", L"match", L"a*", L"a", 0},                0, L"a\n" },
+        { {L"string", L"match", L"a*b*c", L"axxbyyc", 0},       0, L"axxbyyc\n" },
+        { {L"string", L"match", L"a*b?c", L"axxbyc", 0},        0, L"axxbyc\n" },
+        { {L"string", L"match", L"*?", L"a", 0},                0, L"a\n" },
+        { {L"string", L"match", L"*?", L"ab", 0},               0, L"ab\n" },
+        { {L"string", L"match", L"?*", L"a", 0},                0, L"a\n" },
+        { {L"string", L"match", L"?*", L"ab", 0},               0, L"ab\n" },
+        { {L"string", L"match", L"[A-F][^A-F]", L"FG", 0},      0, L"FG\n" },
+        { {L"string", L"match", L"[A][B]", L"AB", 0},           0, L"AB\n" },
+        { {L"string", L"match", L"0x[0-9a-fA-F][0-9a-fA-F]", L"0x6a", 0}, 0, L"0x6a\n" },
+        { {L"string", L"match", L"0x[0-9a-fA-F][0-9a-fA-F]", L"0xA6", 0}, 0, L"0xA6\n" },
+        { {L"string", L"match", L"-i", L"0x[0-9a-f][0-9A-F]", L"0xAb", 0}, 0, L"0xAb\n" },
+        { {L"string", L"match", L"\\*", L"*", 0},               0, L"*\n" },
+        { {L"string", L"match", L"a*\\", L"abc\\", 0},          0, L"abc\\\n" },
+        { {L"string", L"match", L"a*\\?", L"abc?", 0},          0, L"abc?\n" },
+
+        { {L"string", L"match", L"?", L"", 0},                  1, L"" },
+        { {L"string", L"match", L"?", L"ab", 0},                1, L"" },
+        { {L"string", L"match", L"??", L"a", 0},                1, L"" },
+        { {L"string", L"match", L"?a", L"a", 0},                1, L"" },
+        { {L"string", L"match", L"a?", L"a", 0},                1, L"" },
+        { {L"string", L"match", L"a??B", L"axxb", 0},           1, L"" },
+        { {L"string", L"match", L"a*b", L"axxbc", 0},           1, L"" },
+        { {L"string", L"match", L"*b", L"bbba", 0},             1, L"" },
+        { {L"string", L"match", L"0x[0-9a-fA-F][0-9a-fA-F]", L"0xbad", 0}, 1, L"" },
+        // XXX string match -a
+        // XXX string match -n
+        // XXX string match -a -n
+        // XXX string match -q
+        // XXX string match -a -q
+        // XXX string match -r ...
+
+        // XXX string replace
+        // XXX string split
+        // XXX string sub
         { {0}, 0, 0 }
     };
 
