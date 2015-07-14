@@ -356,7 +356,7 @@ string_subcommands[] =
 /**
    The string builtin. Used for manipulating strings.
 */
-static int builtin_string(parser_t &parser, wchar_t **argv)
+/*static*/ int builtin_string(parser_t &parser, wchar_t **argv)
 {
     int argc = builtin_count_args(argv);
     if (argc <= 1)

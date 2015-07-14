@@ -3898,6 +3898,55 @@ static void test_wcstring_tok(void)
     }
 }
 
+int builtin_string(parser_t &parser, wchar_t **argv);
+extern wcstring stdout_buffer;
+static void run_one_string_test(const wchar_t **argv, int expected_rc, const wchar_t *expected_out)
+{
+    parser_t parser(PARSER_TYPE_GENERAL, true);
+    wcstring &out = stdout_buffer;
+    out.clear();
+    int rc = builtin_string(parser, const_cast<wchar_t**>(argv));
+    if (rc != expected_rc || out != expected_out)
+    {
+        wcstring args;
+        for (int i = 0; argv[i] != 0; i++)
+        {
+            args += wcstring(argv[i]) + L' ';
+        }
+        args.resize(args.size() - 1);
+        err(L"Test failed on line %lu: [%ls]", __LINE__, args.c_str());
+    }
+}
+
+static void test_string(void)
+{
+    static struct string_test
+    {
+        const wchar_t *argv[10];
+        int expected_rc;
+        const wchar_t *expected_out;
+    }
+    string_tests[] =
+    {
+        // string escape
+        { {L"string", L"escape", L"a", 0}, 0, L"a\n" },
+        // string join
+        // string length
+        // string match
+        // string replace
+        // string split
+        // string sub
+        { {0}, 0, 0 }
+    };
+
+    struct string_test *t = string_tests;
+    while (t->argv[0] != 0)
+    {
+        run_one_string_test(t->argv, t->expected_rc, t->expected_out);
+        t++;
+    }
+}
+
 /**
    Main test
 */
@@ -3985,6 +4034,7 @@ int main(int argc, char **argv)
     if (should_test_function("history_races")) history_tests_t::test_history_races();
     if (should_test_function("history_formats")) history_tests_t::test_history_formats();
     //history_tests_t::test_history_speed();
+    if (should_test_function("string")) test_string();
 
     say(L"Encountered %d errors in low-level tests", err_count);
     if (s_test_run_count == 0)

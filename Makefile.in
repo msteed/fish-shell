@@ -99,9 +99,9 @@ FISH_INDENT_OBJS := fish_indent.o print_help.o $(FISH_OBJS)
 # Additional files used by builtin.o
 #
 
-BUILTIN_FILES := builtin_set.cpp builtin_commandline.cpp	\
+BUILTIN_FILES := builtin_set.cpp builtin_commandline.cpp		\
 	builtin_ulimit.cpp builtin_complete.cpp builtin_jobs.cpp	\
-	builtin_set_color.cpp builtin_printf.cpp
+	builtin_set_color.cpp builtin_printf.cpp builtin_string.cpp
 
 
 #
