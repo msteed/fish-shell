@@ -3943,7 +3943,11 @@ static void test_string(void)
         { {L"string", L"escape", L"hello world", 0},            0, L"'hello world'\n" },
         { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
 
-        // XXX string join
+        { {L"string", L"join", 0},                              0, L"" },
+        { {L"string", L"join", L".", L"fishshell", L"com", 0},  0, L"fishshell.com\n" },
+        { {L"string", L"join", L"/", L"usr", 0},                0, L"usr\n" },
+        { {L"string", L"join", L"/", L"usr", L"local", L"bin", 0}, 0, L"usr/local/bin\n" },
+        { {L"string", L"join", L"...", L"3", L"2", L"1", 0},    0, L"3...2...1\n" },
 
         { {L"string", L"length", L"", 0},                       0, L"0\n" },
         { {L"string", L"length", L"a", 0},                      0, L"1\n" },

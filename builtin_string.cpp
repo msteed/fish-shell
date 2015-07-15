@@ -16,8 +16,7 @@
 
 // XXX tests
 // XXX documentation & help
-// XXX string_join
-// XXX string_match
+// XXX string_match --regex
 // XXX string_replace
 // XXX string_split
 // XXX string_sub
@@ -82,8 +81,37 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_join(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string join: not yet implemented"));
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L"";
+    const struct woption long_options[] = { 0, 0, 0, 0 };
+
+    woptind = 0;
+    for (;;)
+    {
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        else if (c == '?')
+        {
+            builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+            return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    int i = woptind;
+    const wchar_t *sep = argv[i++];
+    for (; i < argc - 1; i++)
+    {
+        append_format(stdout_buffer, L"%ls%ls", argv[i], sep);
+    }
+    if (i < argc)
+    {
+        append_format(stdout_buffer, L"%ls\n", argv[i]);
+    }
+
+    return BUILTIN_STRING_OK;
 }
 
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
@@ -116,10 +144,9 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
     return BUILTIN_STRING_OK;
 }
 
-
-static bool wildcard_match_string(const wchar_t *pattern, const wchar_t *str, bool ignore_case)
+static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
 {
-    for (; *str != L'\0'; str++, pattern++)
+    for (; *string != L'\0'; string++, pattern++)
     {
         switch (*pattern)
         {
@@ -139,9 +166,9 @@ static bool wildcard_match_string(const wchar_t *pattern, const wchar_t *str, bo
                     return true;
                 }
 
-                while (*str != L'\0')
+                while (*string != L'\0')
                 {
-                    if (wildcard_match_string(pattern, str++, ignore_case))
+                    if (string_match_wildcard(pattern, string++, ignore_case))
                     {
                         return true;
                     }
@@ -158,7 +185,7 @@ static bool wildcard_match_string(const wchar_t *pattern, const wchar_t *str, bo
                 }
 
                 bool match = false;
-                wchar_t strch = ignore_case ? towlower(*str) : *str;
+                wchar_t strch = ignore_case ? towlower(*string) : *string;
                 wchar_t patch, patch2;
                 while ((patch = *pattern++) != L']')
                 {
@@ -196,14 +223,14 @@ static bool wildcard_match_string(const wchar_t *pattern, const wchar_t *str, bo
                 // fall through
 
             default:
-                if (ignore_case ? towlower(*str) != towlower(*pattern) : *str != *pattern)
+                if (ignore_case ? towlower(*string) != towlower(*pattern) : *string != *pattern)
                 {
                     return false;
                 }
                 break;
         }
     }
-    // str is exhausted - it's a match only if pattern is as well
+    // string is exhausted - it's a match only if pattern is as well
     while (*pattern == L'*')
     {
         pattern++;
@@ -281,7 +308,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         }
         else
         {
-            bool match = wildcard_match_string(pattern, argv[i], opt_ignore_case);
+            bool match = string_match_wildcard(pattern, argv[i], opt_ignore_case);
             if (opt_query)
             {
                 if (opt_all && !match)
