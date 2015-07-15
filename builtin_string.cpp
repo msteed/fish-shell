@@ -20,6 +20,7 @@
 // XXX string_replace
 // XXX string_split
 // XXX string_sub
+// XXX is it correct to separate outputs by newlines or spaces?
 
 enum
 {
@@ -347,14 +348,80 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
     string_fatal_error(_(L"string replace: not yet implemented"));
-    // use whatever fish uses to match wildcarded strings?
     return BUILTIN_STRING_ERROR;
 }
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string split: not yet implemented"));
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L"n:";
+    const struct woption long_options[] =
+    {
+        { L"limit", required_argument, 0, 'n'},
+        0, 0, 0, 0
+    };
+
+    int limit = 0;
+    woptind = 0;
+    for (;;)
+    {
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        switch (c)
+        {
+            case 0:
+                break;
+
+            case 'n':
+                limit = int(wcstol(woptarg, 0, 10));
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+                return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    if (argc < woptind + 1)
+    {
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    int i = woptind;
+    const wchar_t *sep = argv[i++];
+    int seplen = wcslen(sep);
+    int scount = 0;
+    for (; i < argc; i++)
+    {
+        wchar_t *cur = argv[i];
+        while (cur != 0)
+        {
+            wchar_t *ptr = (limit > 0 && scount >= limit) ? 0 : wcsstr(cur, sep);
+            if (ptr == 0)
+            {
+                append_format(stdout_buffer, L"%ls ", cur);
+                cur = 0;
+            }
+            else
+            {
+                append_format(stdout_buffer, L"%ls ", wcstring(cur, ptr - cur).c_str());
+                cur = ptr + seplen;
+                scount++;
+            }
+        }
+    }
+
+    // Trim leading & trailing spaces
+    stdout_buffer.erase(0, stdout_buffer.find_first_not_of(L" "));
+    stdout_buffer.erase(stdout_buffer.find_last_not_of(L" ") + 1);
+
+    append_format(stdout_buffer, L"\n");
+
+    return BUILTIN_STRING_OK;
 }
 
 static int string_sub(parser_t &parser, int argc, wchar_t **argv)
@@ -388,7 +455,7 @@ string_subcommands[] =
     int argc = builtin_count_args(argv);
     if (argc <= 1)
     {
-        string_fatal_error(_(L"%ls: Expected at least one argument"), argv[0]);
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
         builtin_print_help(parser, L"string", stderr_buffer);
         return BUILTIN_STRING_ERROR;
     }
