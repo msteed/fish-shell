@@ -18,8 +18,6 @@
 // XXX documentation & help
 // XXX string_match --regex
 // XXX string_replace
-// XXX string_split
-// XXX string_sub
 // XXX is it correct to separate outputs by newlines or spaces?
 
 enum
@@ -48,6 +46,13 @@ static void string_fatal_error(const wchar_t *fmt, ...)
     this->exit_code = STATUS_BUILTIN_ERROR;
     this->early_exit = true;
 #endif
+}
+
+static void trim(wcstring &s)
+{
+    // Trim leading & trailing spaces
+    s.erase(0, s.find_first_not_of(L" "));
+    s.erase(s.find_last_not_of(L" ") + 1);
 }
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
@@ -353,7 +358,7 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"n:";
+    const wchar_t *short_options = L":n:";
     const struct woption long_options[] =
     {
         { L"limit", required_argument, 0, 'n'},
@@ -378,6 +383,10 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             case 'n':
                 limit = int(wcstol(woptarg, 0, 10));
                 break;
+
+            case ':':
+                string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+                return BUILTIN_STRING_ERROR;
 
             case '?':
                 builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
@@ -408,26 +417,171 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             }
             else
             {
-                append_format(stdout_buffer, L"%ls ", wcstring(cur, ptr - cur).c_str());
+                if (ptr > cur) // skip empty strings (contiguous separators)
+                {
+                    append_format(stdout_buffer, L"%ls ", wcstring(cur, ptr - cur).c_str());
+                }
                 cur = ptr + seplen;
                 scount++;
             }
         }
     }
 
-    // Trim leading & trailing spaces
-    stdout_buffer.erase(0, stdout_buffer.find_first_not_of(L" "));
-    stdout_buffer.erase(stdout_buffer.find_last_not_of(L" ") + 1);
-
-    append_format(stdout_buffer, L"\n");
+    trim(stdout_buffer);
+    if (!stdout_buffer.empty())
+    {
+        append_format(stdout_buffer, L"\n");
+    }
 
     return BUILTIN_STRING_OK;
 }
 
 static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string sub: not yet implemented"));
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L":e:l:s:";
+    const struct woption long_options[] =
+    {
+        { L"end", required_argument, 0, 'e'},
+        { L"length", required_argument, 0, 'l'},
+        { L"start", required_argument, 0, 's'},
+        0, 0, 0, 0
+    };
+
+    int start = -1;
+    int end = -1;
+    int length = -1;
+    woptind = 0;
+    for (;;)
+    {
+        int c = wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        switch (c)
+        {
+            case 0:
+                break;
+
+            case 'e':
+                if (start != -1 && length != -1)
+                {
+                    string_fatal_error(BUILTIN_ERR_COMBO, argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                end = int(wcstol(woptarg, 0, 10));
+                if (end <= 0)
+                {
+                    string_fatal_error(L"%ls: Invalid end value\n", argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                break;
+
+            case 'l':
+                if (start != -1 && end != -1)
+                {
+                    string_fatal_error(BUILTIN_ERR_COMBO, argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                length = int(wcstol(woptarg, 0, 10));
+                if (length < 0)
+                {
+                    string_fatal_error(L"%ls: Invalid length value\n", argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                break;
+
+            case 's':
+                if (end != -1 && length != -1)
+                {
+                    string_fatal_error(BUILTIN_ERR_COMBO, argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                start = int(wcstol(woptarg, 0, 10));
+                if (start <= 0)
+                {
+                    string_fatal_error(L"%ls: Invalid start value\n", argv[0]);
+                    return BUILTIN_STRING_ERROR;
+                }
+                break;
+
+            case ':':
+                string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+                return BUILTIN_STRING_ERROR;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
+                return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    int result = 0;
+    for (int i = woptind; i < argc; i++)
+    {
+        // Convert start/end/length to pos, count
+        int pos = 0;
+        int count = -1;
+        if (start > 0)
+        {
+            pos = start - 1;
+        }
+        if (length >= 0)
+        {
+            count = length;
+        }
+        if (end > 0)
+        {
+            if (start > 0)
+            {
+                count = end - start + 1;
+            }
+            else if (length >= 0)
+            {
+                pos = end - length;
+            }
+            else
+            {
+                count = end;
+            }
+        }
+
+        // Check range & set return value
+        wcstring s(argv[i]);
+        if (pos < 0)
+        {
+            if (count != -1)
+            {
+                count += pos;
+                if (count < 0)
+                {
+                    count = 0;
+                }
+            }
+            pos = 0;
+            result = 1;
+        }
+        if (pos > s.size())
+        {
+            pos = s.size();
+            result = 1;
+        }
+        if (count != -1 && pos + count > s.size())
+        {
+            count = -1;
+            result = 1;
+        }
+        wcstring::size_type scount = (count == -1) ? wcstring::npos : count;
+        append_format(stdout_buffer, L"%ls ", s.substr(pos, scount).c_str());
+    }
+
+    trim(stdout_buffer);
+    if (!stdout_buffer.empty())
+    {
+        append_format(stdout_buffer, L"\n");
+    }
+
+    return result;
 }
 
 static const struct string_subcommand

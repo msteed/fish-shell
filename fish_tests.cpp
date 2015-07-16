@@ -4002,8 +4002,16 @@ static void test_string(void)
         // XXX string match -r ...
 
         // XXX string replace
-        // XXX string split
+
+        { {L"string", L"split", 0},                             1, L"" },
+        { {L"string", L"split", L":", 0},                       0, L"\n" },
+        { {L"string", L"split", L".", L"www.ch.ic.ac.uk", 0},   0, L"www ch ic ac uk\n" },
+        { {L"string", L"split", L"-n0", L"/", L"/usr/local/bin/fish", 0}, 0, L"usr local bin fish\n" },
+        { {L"string", L"split", L"-n2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a b c d e:f\n" },
+        { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a b -c d\n" },
+
         // XXX string sub
+
         { {0}, 0, 0 }
     };
 
