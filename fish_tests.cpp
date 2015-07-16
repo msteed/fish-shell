@@ -3944,6 +3944,7 @@ static void test_string(void)
         { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
 
         { {L"string", L"join", 0},                              0, L"" },
+        { {L"string", L"join", L"", L"a", L"b", L"c", 0},       0, L"abc\n" },
         { {L"string", L"join", L".", L"fishshell", L"com", 0},  0, L"fishshell.com\n" },
         { {L"string", L"join", L"/", L"usr", 0},                0, L"usr\n" },
         { {L"string", L"join", L"/", L"usr", L"local", L"bin", 0}, 0, L"usr/local/bin\n" },
@@ -4004,11 +4005,11 @@ static void test_string(void)
         // XXX string replace
 
         { {L"string", L"split", 0},                             1, L"" },
-        { {L"string", L"split", L":", 0},                       0, L"\n" },
-        { {L"string", L"split", L".", L"www.ch.ic.ac.uk", 0},   0, L"www ch ic ac uk\n" },
-        { {L"string", L"split", L"-n0", L"/", L"/usr/local/bin/fish", 0}, 0, L"usr local bin fish\n" },
-        { {L"string", L"split", L"-n2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a b c d e:f\n" },
-        { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a b -c d\n" },
+        { {L"string", L"split", L":", 0},                       0, L"" },
+        { {L"string", L"split", L".", L"www.ch.ic.ac.uk", 0},   0, L"www\nch\nic\nac\nuk\n" },
+        { {L"string", L"split", L"-n0", L"/", L"/usr/local/bin/fish", 0}, 0, L"\nusr\nlocal\nbin\nfish\n" },
+        { {L"string", L"split", L"-n2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a\nb\nc\nd\ne:f\n" },
+        { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a\nb\n-c\n\nd\n" },
 
         // XXX string sub
 
