@@ -3938,7 +3938,7 @@ static void test_string(void)
     {
         { {L"string", L"escape", L"a", 0},                      0, L"a\n" },
         { {L"string", L"escape", L"", 0},                       0, L"''\n" },
-        { {L"string", L"escape", L"\a", 0},                     0, L"\\cg\n" },
+        { {L"string", L"escape", L"\x07", 0},                   0, L"\\cg\n" },
         { {L"string", L"escape", L"\"x\"", 0},                  0, L"'\"x\"'\n" },
         { {L"string", L"escape", L"hello world", 0},            0, L"'hello world'\n" },
         { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
@@ -4011,7 +4011,27 @@ static void test_string(void)
         { {L"string", L"split", L"-n2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a\nb\nc\nd\ne:f\n" },
         { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a\nb\n-c\n\nd\n" },
 
-        // XXX string sub
+        { {L"string", L"sub", 0},                               0, L"" },
+        { {L"string", L"sub", L"abcde", 0},                      0, L"abcde\n"},
+        { {L"string", L"sub", L"-l0", L"abcde", 0},              0, L"\n"},
+        { {L"string", L"sub", L"-l2", L"abcde", 0},              0, L"ab\n"},
+        { {L"string", L"sub", L"-l5", L"abcde", 0},              0, L"abcde\n"},
+        { {L"string", L"sub", L"-l6", L"abcde", 0},              0, L"abcde\n"},
+        { {L"string", L"sub", L"-l-1", L"abcde", 0},             1, L""},
+        { {L"string", L"sub", L"-s0", L"abcde", 0},              1, L""},
+        { {L"string", L"sub", L"-s1", L"abcde", 0},              0, L"abcde\n"},
+        { {L"string", L"sub", L"-s5", L"abcde", 0},              0, L"e\n"},
+        { {L"string", L"sub", L"-s6", L"abcde", 0},              0, L"\n"},
+        { {L"string", L"sub", L"-s-1", L"abcde", 0},             0, L"e\n"},
+        { {L"string", L"sub", L"-s-5", L"abcde", 0},             0, L"abcde\n"},
+        { {L"string", L"sub", L"-s-6", L"abcde", 0},             0, L"abcde\n"},
+        { {L"string", L"sub", L"-s1", L"-l0", L"abcde", 0},      0, L"\n"},
+        { {L"string", L"sub", L"-s1", L"-l1", L"abcde", 0},      0, L"a\n"},
+        { {L"string", L"sub", L"-s2", L"-l2", L"abcde", 0},      0, L"bc\n"},
+        { {L"string", L"sub", L"-s-1", L"-l1", L"abcde", 0},     0, L"e\n"},
+        { {L"string", L"sub", L"-s-1", L"-l2", L"abcde", 0},     0, L"e\n"},
+        { {L"string", L"sub", L"-s-3", L"-l2", L"abcde", 0},     0, L"cd\n"},
+        { {L"string", L"sub", L"-s-3", L"-l4", L"abcde", 0},     0, L"cde\n"},
 
         { {0}, 0, 0 }
     };
