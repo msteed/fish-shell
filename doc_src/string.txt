@@ -3,8 +3,8 @@
 \subsection string-synopsis Synopsis
 \fish{synopsis}
 string length [STRING...]
-string sub [(-s | --start)] [(-e | --end)] [(-l | --length)] [STRING...]
-string split [(-n | --limit)] SEP [STRING...]
+string sub [(-s | --start)] [(-l | --length)] [STRING...]
+string split [(-n | --limit) LIMIT] SEP [STRING...]
 string join SEP [STRING...]
 string escape [STRING...]
 string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
@@ -21,27 +21,76 @@ The following subcommands are available:
 
 - `length` reports the length of each string argument in characters.
 
-- `sub` prints a substring of each string argument.
+- `sub` prints a substring of each string argument. The start of the substring can be specified with `-s` or `--start` followed by a 1-based index value. Positive index values are relative to the start of the string and negative index values are relative to the end of the string. The default start value is 1. The length of the substring can be specified with `-l` or `--length`. If the length is not specified, the substring continues to the end of each string argument.
 
-- `split` splits each string argument on a separator.
+- `split` splits each string argument on the separator SEP. If a limit is given with `-n` or `--limit`, at most that many splits are done.
 
-- `join` joins its string arguments into a single string.
+- `join` joins its string arguments into a single string separated by SEP, which can be an empty string.
 
 - `escape` escapes each string argument such that it can be passed back to `eval` to produce the original argument again.
 
-- `match` tests each string against a pattern and prints matching substrings.
+- `match` tests each string against a pattern and prints matching substrings. Unless `-a` or `--all` is specified, only the first match is reported. Matching can be made case-insensitive with `-i` or `--ignore-case`. If `-n` or `--index` is given, the 1-based index of the start of each match is reported instead of the matching substring, or 0 for no match. If `-q` or `--query` is given, no match results are printed and the return value indicates whether at least one string argument matched (or all string arguments matched if `-a` or `--all` is given). By default, PATTERN is interpreted as a glob pattern matched against each entire string argument. If `-r` or `--regex` is given, the pattern is interpreted as a regular expression.
 
 - `replace` similar to `match` but replaces matching substrings with a replacement string and prints the result.
-
 
 \subsection string-example Examples
 
 \fish
 string length 'hello, world'
-string sub ...
-string split ...
-string join ... (seq 10 -1 0)
-string escape ...
-string match ...
+# Prints 12
+\endfish
+
+\fish
+string sub --length 2 abcde
+# Prints ab
+
+string sub -s 2 -l 2 abcde
+# Prints bc
+
+string sub --start -2 abcde
+# Prints de
+\endfish
+
+\fish
+string split . example.com
+# Prints example com
+
+string split -n 2 . a.b.c.d
+# Prints a b c.d
+\endfish
+
+\fish
+string join ... (seq 3)
+# Prints 1...2...3
+\endfish
+
+\fish
+echo -e '\a' | string escape
+# Prints \cg
+\endfish
+
+\fish
+# glob examples
+
+string match '?' a
+# Prints a
+
+string match 'a*b' axxb
+# Prints axxb
+
+string match -i 'a??B' axxb
+# Prints axxb
+
+string match -a -i '[aeiou]' A B C D E
+# Prints A E
+
+string match '[^fb]*' foo bar baz qux
+# Prints qux
+
+string match '*\?' 'ok?'
+# Prints ok?
+\endfish
+
+\fish
 string replace ...
 \endfish

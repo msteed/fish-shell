@@ -15,9 +15,11 @@
 //#include "wgetopt.h"
 
 // XXX tests
-// XXX documentation & help
+// XXX documentation & help - finish & fix formatting
 // XXX string_match --regex
 // XXX string_replace
+// XXX review & document return values
+// XXX other possible subcommands: upper, lower, trim, rsplit, startswith, endswith
 
 enum
 {
@@ -294,9 +296,10 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    int result = 1; // no match
     int i = woptind;
     wchar_t *pattern = argv[i++];
+    int args = argc - i;
+    int matches = 0;
     for (; i < argc; i++)
     {
         if (opt_regex)
@@ -307,39 +310,32 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         else
         {
             bool match = string_match_wildcard(pattern, argv[i], opt_ignore_case);
-            if (opt_query)
+            if (match)
             {
-                if (opt_all && !match)
-                {
-                    result = 1;
-                    break;
-                }
-                if (!opt_all && match)
-                {
-                    result = 0;
-                    break;
-                }
+                matches++;
             }
-            else
+            if (!opt_query)
             {
                 if (opt_index)
                 {
-                    append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
+                    if (match || opt_all)
+                    {
+                        append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
+                    }
                 }
                 else if (match)
                 {
                     append_format(stdout_buffer, L"%ls\n", argv[i]);
-                    result = 0; // at least one match
-                    if (!opt_all)
-                    {
-                        break;
-                    }
                 }
+            }
+            if (match && !opt_all)
+            {
+                break;
             }
         }
     }
 
-    return result;
+    return opt_all ? (matches < args) : (matches == 0);
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
