@@ -12,7 +12,7 @@ string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
 string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
                PATTERN REPLACEMENT [STRING...]
 # other possible subcommands: upper, lower, trim, startswith, endswith
-# possibly add a -r|--right option to split to split left-to-right
+# possibly add a -r|--right option to split to operate right-to-left (useful with -n)
 \endfish
 
 \subsection string-description Description
