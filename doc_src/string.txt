@@ -11,6 +11,8 @@ string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
              [(-n | --index)] [(-q | --query)] PATTERN [STRING...]
 string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
                PATTERN REPLACEMENT [STRING...]
+# other possible subcommands: upper, lower, trim, startswith, endswith
+# possibly add a -r|--right option to split to split left-to-right
 \endfish
 
 \subsection string-description Description
