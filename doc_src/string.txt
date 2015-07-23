@@ -4,7 +4,7 @@
 \fish{synopsis}
 string length [(-q | --quiet)] [--] [STRING...]
 string sub [(-s | --start)] [(-l | --length)] [(-q | --quiet)] [STRING...]
-string split [(-n | --limit) LIMIT] [(-r | --right)] [(-q | --quiet)] [--]
+string split [(-m | --max) MAX] [(-r | --right)] [(-q | --quiet)] [--]
              SEP [STRING...]
 string join [(-q | --quiet)] [--] SEP [STRING...]
 string trim [(-l | --left)] [(-r | --right)] [(-c | --chars CHARS)]
