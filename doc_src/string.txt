@@ -27,6 +27,10 @@ Arguments beginning with `-` are normally interpreted as switches; `--` causes t
 
 Most subcommands accept a `-q` or `--quiet` switch, which suppresses the usual output but exits with the documented status.
 
+TBD: Currently, multiple outputs are separated by newlines. Should IFS be used instead?
+
+TBD: Magic behavior when used in command substitution: no IFS splitting.
+
 The following subcommands are available:
 
 - `length` reports the length of each string argument in characters. Exit status: 0 if at least one non-empty STRING was given, or 1 otherwise.
@@ -117,9 +121,9 @@ string match 'a*b' axxb
 # Output:
 # axxb
 
-string match -i 'a??B' axxb
+string match -i 'a??B' Axxb
 # Output:
-# axxb
+# Axxb
 
 string match -a -i '[aeiou]' A B C D E
 # Output:
