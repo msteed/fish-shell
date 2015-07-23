@@ -2,18 +2,18 @@
 
 \subsection string-synopsis Synopsis
 \fish{synopsis}
-string length [(-q | --quiet)] [STRING...]
+string length [(-q | --quiet)] [--] [STRING...]
 string sub [(-s | --start)] [(-l | --length)] [(-q | --quiet)] [STRING...]
-string split [(-n | --limit) LIMIT] [(-r | --right)] [(-q | --quiet)]
+string split [(-n | --limit) LIMIT] [(-r | --right)] [(-q | --quiet)] [--]
              SEP [STRING...]
-string join [(-q | --quiet)] SEP [STRING...]
+string join [(-q | --quiet)] [--] SEP [STRING...]
 string trim [(-l | --left)] [(-r | --right)] [(-c | --chars CHARS)]
-            [(-q | --quiet)] [STRING...]
-string escape [STRING...]
+            [(-q | --quiet)] [--] [STRING...]
+string escape [--] [STRING...]
 string match [(-m | --max) MAX] [(-i | --ignore-case)] [(-r | --regex)]
-             [(-n | --index)] [(-q | --quiet)] PATTERN [STRING...]
+             [(-n | --index)] [(-q | --quiet)] [--] PATTERN [STRING...]
 string replace [(-m | --max) MAX] [(-i | --ignore-case)] [(-r | --regex)]
-               [(-q | --quiet)] PATTERN REPLACEMENT [STRING...]
+               [(-q | --quiet)] [--] PATTERN REPLACEMENT [STRING...]
 \endfish
 
 
@@ -21,9 +21,9 @@ string replace [(-m | --max) MAX] [(-i | --ignore-case)] [(-r | --regex)]
 
 `string` performs operations on strings.
 
-Strings to operate on are taken from the command line unless standard input is connected to a pipe or a file, in which case the strings are read from standard input. It is an error to supply strings on the command line and on standard input.
+STRING arguments are taken from the command line unless standard input is connected to a pipe or a file, in which case they are read from standard input. It is an error to supply STRING arguments on the command line and on standard input.
 
-Arguments beginning with `-` are normally interpreted as switches; `--` causes the following arguments not to be treated as switches even if they begin with `-`. Switches are recognized only on the command line.
+Arguments beginning with `-` are normally interpreted as switches; `--` causes the following arguments not to be treated as switches even if they begin with `-`. Switches and required arguments are recognized only on the command line.
 
 Most subcommands accept a `-q` or `--quiet` switch, which suppresses the usual output but exits with the documented status.
 
