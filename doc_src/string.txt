@@ -94,9 +94,10 @@ string trim \tabc\ d\n
 # Output:
 # abc d
 
-string trim -r -c yz xyzzy
+string trim -r -c yz xyzzy zany
 # Output:
 # x
+# zan
 \endfish
 
 \fish
