@@ -2,95 +2,136 @@
 
 \subsection string-synopsis Synopsis
 \fish{synopsis}
-string length [STRING...]
-string sub [(-s | --start)] [(-l | --length)] [STRING...]
-string split [(-n | --limit) LIMIT] SEP [STRING...]
-string join SEP [STRING...]
+string length [(-q | --quiet)] [STRING...]
+string sub [(-s | --start)] [(-l | --length)] [(-q | --quiet)] [STRING...]
+string split [(-n | --limit) LIMIT] [(-r | --right)] [(-q | --quiet)]
+             SEP [STRING...]
+string join [(-q | --quiet)] SEP [STRING...]
+string trim [(-l | --left)] [(-r | --right)] [(-c | --chars CHARS)]
+            [(-q | --quiet)] [STRING...]
 string escape [STRING...]
-string match [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
-             [(-n | --index)] [(-q | --query)] PATTERN [STRING...]
-string replace [(-a | --all)] [(-i | --ignore-case)] [(-r | --regex)]
-               PATTERN REPLACEMENT [STRING...]
-# other possible subcommands: upper, lower, trim, startswith, endswith
-# possibly add a -r|--right option to split to operate right-to-left (useful with -n)
+string match [(-m | --max) MAX] [(-i | --ignore-case)] [(-r | --regex)]
+             [(-n | --index)] [(-q | --quiet)] PATTERN [STRING...]
+string replace [(-m | --max) MAX] [(-i | --ignore-case)] [(-r | --regex)]
+               [(-q | --quiet)] PATTERN REPLACEMENT [STRING...]
 \endfish
+
 
 \subsection string-description Description
 
 `string` performs operations on strings.
 
+Strings to operate on are taken from the command line unless standard input is connected to a pipe or a file, in which case the strings are read from standard input. It is an error to supply strings on the command line and on standard input.
+
+Arguments beginning with `-` are normally interpreted as switches; `--` causes the following arguments not to be treated as switches even if they begin with `-`. Switches are recognized only on the command line.
+
+Most subcommands accept a `-q` or `--quiet` switch, which suppresses the usual output but exits with the documented status.
+
 The following subcommands are available:
 
-- `length` reports the length of each string argument in characters.
+- `length` reports the length of each string argument in characters. Exit status: 0 if at least one non-empty STRING was given, or 1 otherwise.
 
-- `sub` prints a substring of each string argument. The start of the substring can be specified with `-s` or `--start` followed by a 1-based index value. Positive index values are relative to the start of the string and negative index values are relative to the end of the string. The default start value is 1. The length of the substring can be specified with `-l` or `--length`. If the length is not specified, the substring continues to the end of each string argument.
+- `sub` prints a substring of each string argument. The start of the substring can be specified with `-s` or `--start` followed by a 1-based index value. Positive index values are relative to the start of the string and negative index values are relative to the end of the string. The default start value is 1. The length of the substring can be specified with `-l` or `--length`. If the length is not specified, the substring continues to the end of each STRING. Exit status: 0 if at least one substring operation was performed, 1 otherwise.
 
-- `split` splits each string argument on the separator SEP. If a limit is given with `-n` or `--limit`, at most that many splits are done.
+- `split` splits each STRING on the separator SEP. If `-m` or `--max` is specified, at most MAX splits are done. If `-r` or `--right` is given, splitting is performed right-to-left. This is useful in combination with `-m` or `--max`. Exit status: 0 if at least one split was performed, or 1 otherwise.
 
-- `join` joins its string arguments into a single string separated by SEP, which can be an empty string.
+- `join` joins its STRING arguments into a single string separated by SEP, which can be an empty string. Exit status: 0 if at least one join was performed, or 1 otherwise.
 
-- `escape` escapes each string argument such that it can be passed back to `eval` to produce the original argument again.
+- `trim` removes leading and trailing whitespace from each STRING. If `-l` or `--left` is given, only leading whitespace is removed. If `-r` or `--right` is given, only trailing whitespace is trimmed. The `-c` or `--chars` switch causes the characters in CHARS to be removed instead of whitespace. Exit status: 0 if at least one character was trimmed, or 1 otherwise.
 
-- `match` tests each string against a pattern and prints matching substrings. Unless `-a` or `--all` is specified, only the first match is reported. Matching can be made case-insensitive with `-i` or `--ignore-case`. If `-n` or `--index` is given, the 1-based index of the start of each match is reported instead of the matching substring, or 0 for no match. If `-q` or `--query` is given, no match results are printed and the return value indicates whether at least one string argument matched (or all string arguments matched if `-a` or `--all` is given). By default, PATTERN is interpreted as a glob pattern matched against each entire string argument. If `-r` or `--regex` is given, the pattern is interpreted as a regular expression.
+- `escape` escapes each STRING such that it can be passed back to `eval` to produce the original argument again. Exit status: 0 if at least one string was escaped, or 1 otherwise.
 
-- `replace` similar to `match` but replaces matching substrings with a replacement string and prints the result.
+- `match` tests each STRING against a pattern and prints matching substrings. All matches are printed unless `-m` or `--max` is given, in which cases at most MAX matches are reported. Matching can be made case-insensitive with `-i` or `--ignore-case`. If `-n` or `--index` is given, the 1-based index of the start of each match is reported instead of the matching substring, or 0 for no match. By default, PATTERN is interpreted as a glob pattern matched against each entire string argument. If `-r` or `--regex` is given, the pattern is interpreted as a regular expression. Exit status: 0 if at least one match was found, or 1 otherwise.
+
+- `replace` similar to `match` but replaces matching substrings with a replacement string and prints the result. Exit status: 0 if at least one replacement was performed, or 1 otherwise.
+
 
 \subsection string-example Examples
 
 \fish
 string length 'hello, world'
-# Prints 12
+# Output:
+# 12
+
+string length -q $str
+# Equivalent to test -n $str
 \endfish
 
 \fish
 string sub --length 2 abcde
-# Prints ab
+# Output:
+# ab
 
 string sub -s 2 -l 2 abcde
-# Prints bc
+# Output:
+# bc
 
 string sub --start -2 abcde
-# Prints de
+# Output:
+# de
 \endfish
 
 \fish
 string split . example.com
-# Prints example com
+# Output:
+# example
+# com
 
-string split -n 2 . a.b.c.d
-# Prints a b c.d
+string split -r -n1 / /usr/local/bin/fish
+# Output:
+# /usr/local/bin
+# fish
 \endfish
 
 \fish
-string join ... (seq 3)
-# Prints 1...2...3
+seq 3 | string join ...
+# Output:
+# 1...2...3
 \endfish
 
 \fish
-echo -e '\a' | string escape
-# Prints \cg
+string trim \tabc\ d\n
+# Output:
+# abc d
+
+string trim -r -c yz xyzzy
+# Output:
+# x
+\endfish
+
+\fish
+echo \a | string escape
+# Output:
+# \cg
 \endfish
 
 \fish
 # glob examples
 
 string match '?' a
-# Prints a
+# Output:
+# a
 
 string match 'a*b' axxb
-# Prints axxb
+# Output:
+# axxb
 
 string match -i 'a??B' axxb
-# Prints axxb
+# Output:
+# axxb
 
 string match -a -i '[aeiou]' A B C D E
-# Prints A E
+# Output:
+# A
+# E
 
 string match '[^fb]*' foo bar baz qux
-# Prints qux
+# Output:
+# qux
 
-string match '*\?' 'ok?'
-# Prints ok?
+echo 'ok?' | string match '*\?'
+# Output:
+# ok?
 \endfish
 
 \fish

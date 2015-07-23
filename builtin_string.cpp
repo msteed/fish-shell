@@ -18,8 +18,9 @@
 // XXX documentation & help - finish & fix formatting
 // XXX string_match --regex
 // XXX string_replace
-// XXX review & document return values
-// XXX other possible subcommands: upper, lower, trim, rsplit, startswith, endswith
+// XXX finalize & document return values
+// XXX split: default to splitting on whitespace?
+// XXX accept arguments from stdin if !isatty(stdin)
 
 enum
 {
@@ -346,14 +347,16 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L":n:";
+    const wchar_t *short_options = L":n:r";
     const struct woption long_options[] =
     {
         { L"limit", required_argument, 0, 'n'},
+        { L"right", no_argument, 0, 'r'},
         0, 0, 0, 0
     };
 
     int limit = 0;
+    bool right = false;
     woptind = 0;
     for (;;)
     {
@@ -370,6 +373,10 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
 
             case 'n':
                 limit = int(wcstol(woptarg, 0, 10));
+                break;
+
+            case 'r':
+                right = true;
                 break;
 
             case ':':

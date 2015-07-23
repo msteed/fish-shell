@@ -4009,6 +4009,7 @@ static void test_string(void)
         { {L"string", L"split", L".", L"www.ch.ic.ac.uk", 0},   0, L"www\nch\nic\nac\nuk\n" },
         { {L"string", L"split", L"-n0", L"/", L"/usr/local/bin/fish", 0}, 0, L"\nusr\nlocal\nbin\nfish\n" },
         { {L"string", L"split", L"-n2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a\nb\nc\nd\ne:f\n" },
+        { {L"string", L"split", L"-n1", L"-r", L"/", L"/usr/local/bin/fish", 0}, 0, L"/usr/local/bin\nfish\n" },
         { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a\nb\n-c\n\nd\n" },
 
         { {L"string", L"sub", 0},                               0, L"" },
