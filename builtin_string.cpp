@@ -14,7 +14,7 @@
 #include "common.h"
 //#include "wgetopt.h"
 
-// XXX tests
+// XXX verify test coverage including edge cases like empty strings
 // XXX documentation & help - finish & fix formatting
 // XXX string_match --regex
 // XXX string_replace
@@ -347,15 +347,15 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L":n:r";
+    const wchar_t *short_options = L":m:r";
     const struct woption long_options[] =
     {
-        { L"limit", required_argument, 0, 'n'},
+        { L"max", required_argument, 0, 'm'},
         { L"right", no_argument, 0, 'r'},
         0, 0, 0, 0
     };
 
-    int limit = 0;
+    int max = 0;
     bool right = false;
     woptind = 0;
     for (;;)
@@ -371,8 +371,8 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             case 0:
                 break;
 
-            case 'n':
-                limit = int(wcstol(woptarg, 0, 10));
+            case 'm':
+                max = int(wcstol(woptarg, 0, 10));
                 break;
 
             case 'r':
@@ -399,22 +399,54 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     const wchar_t *sep = argv[i++];
     int seplen = wcslen(sep);
     int scount = 0;
-    for (; i < argc; i++)
+    if (right)
     {
-        wchar_t *cur = argv[i];
-        while (cur != 0)
+        for (; i < argc; i++)
         {
-            wchar_t *ptr = (limit > 0 && scount >= limit) ? 0 : wcsstr(cur, sep);
-            if (ptr == 0)
+            std::list<wcstring> splits;
+            wchar_t *end = argv[i] + wcslen(argv[i]);
+            wchar_t *cur = end - seplen;
+            if (seplen > 0)
             {
-                append_format(stdout_buffer, L"%ls\n", cur);
-                cur = 0;
+                while (cur >= argv[i] && (max == 0 || scount < max))
+                {
+                    if (wcsncmp(cur, sep, seplen) == 0)
+                    {
+                        splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
+                        end = cur;
+                        scount++;
+                    }
+                    cur--;
+                }
+                splits.push_front(wcstring(argv[i], end - argv[i]).c_str());
             }
-            else
+            std::list<wcstring>::const_iterator si = splits.begin();
+            while (si != splits.end())
             {
-                append_format(stdout_buffer, L"%ls\n", wcstring(cur, ptr - cur).c_str());
-                cur = ptr + seplen;
-                scount++;
+                append_format(stdout_buffer, L"%ls\n", (*si).c_str());
+                si++;
+            }
+        }
+    }
+    else
+    {
+        for (; i < argc; i++)
+        {
+            wchar_t *cur = argv[i];
+            while (cur != 0)
+            {
+                wchar_t *ptr = (seplen == 0 || (max > 0 && scount >= max)) ? 0 : wcsstr(cur, sep);
+                if (ptr == 0)
+                {
+                    append_format(stdout_buffer, L"%ls\n", cur);
+                    cur = 0;
+                }
+                else
+                {
+                    append_format(stdout_buffer, L"%ls\n", wcstring(cur, ptr - cur).c_str());
+                    cur = ptr + seplen;
+                    scount++;
+                }
             }
         }
     }
