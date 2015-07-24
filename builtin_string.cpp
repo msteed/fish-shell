@@ -101,6 +101,12 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
+    if (argc - woptind < 1)
+    {
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
     int i = woptind;
     const wchar_t *sep = argv[i++];
     for (; i < argc - 1; i++)
