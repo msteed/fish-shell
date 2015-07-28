@@ -68,14 +68,14 @@ static const wchar_t *string_get_arg_stdin()
             }
             else
             {
-                size_t sz = mbrtowc(&wch, &ch, 1, &state);
-                if (sz == size_t(-1))
+                size_t n = mbrtowc(&wch, &ch, 1, &state);
+                if (n == size_t(-1))
                 {
                     // invalid multibyte sequence
                     // XXX communicate error to caller
                     memset(&state, 0, sizeof(state));
                 }
-                else if (sz == size_t(-2))
+                else if (n == size_t(-2))
                 {
                     // incomplete sequence, continue reading
                 }
