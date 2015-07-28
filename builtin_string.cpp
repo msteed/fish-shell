@@ -21,6 +21,7 @@
 // XXX finalize & document return values
 // XXX split: default to splitting on whitespace?
 // XXX accept arguments from stdin if !isatty(stdin)
+// XXX string escape: support flags: ESCAPE_ALL, ESCAPE_NO_QUOTED, ESCAPE_NO_TILDE
 
 enum
 {
@@ -48,6 +49,82 @@ static void string_fatal_error(const wchar_t *fmt, ...)
     this->exit_code = STATUS_BUILTIN_ERROR;
     this->early_exit = true;
 #endif
+}
+
+static const wchar_t *string_get_arg_stdin()
+{
+    static wcstring arg;
+
+    arg.clear();
+
+    bool eof = false;
+    bool gotarg = false;
+
+    for (;;)
+    {
+        wchar_t wch = L'\0';
+        mbstate_t state = {};
+        for (;;)
+        {
+            char ch = '\0';
+            if (read_blocked(builtin_stdin, &ch, 1) <= 0)
+            {
+                eof = true;
+                break;
+            }
+            else
+            {
+                size_t sz = mbrtowc(&wch, &ch, 1, &state);
+                if (sz == size_t(-1))
+                {
+                    // invalid multibyte sequence
+                    // XXX communicate error to caller
+                    memset(&state, 0, sizeof(state));
+                }
+                else if (sz == size_t(-2))
+                {
+                    // incomplete sequence, continue reading
+                }
+                else
+                {
+                    // got a complete char (could be L'\0')
+                    break;
+                }
+            }
+        }
+
+        if (eof)
+        {
+            break;
+        }
+
+        if (wch == L'\n')
+        {
+            gotarg = true;
+            break;
+        }
+
+        arg += wch;
+    }
+
+    return gotarg ? arg.c_str() : 0;
+}
+
+static const wchar_t *string_get_arg_argv(int *argidx, wchar_t **argv)
+{
+    return (argv && argv[*argidx]) ? argv[(*argidx)++] : 0;
+}
+
+static inline const wchar_t *string_get_arg(int *argidx, wchar_t **argv)
+{
+    if (isatty(builtin_stdin))
+    {
+        return string_get_arg_argv(argidx, argv);
+    }
+    else
+    {
+        return string_get_arg_stdin();
+    }
 }
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
@@ -101,24 +178,28 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    if (argc - woptind < 1)
+    int i = woptind;
+    const wchar_t *sep;
+    if ((sep = string_get_arg_argv(&i, argv)) == 0)
     {
         string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
         return BUILTIN_STRING_ERROR;
     }
 
-    int i = woptind;
-    const wchar_t *sep = argv[i++];
-    for (; i < argc - 1; i++)
+    int njoins = 0;
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
     {
-        append_format(stdout_buffer, L"%ls%ls", argv[i], sep);
+        append_format(stdout_buffer, L"%ls%ls", arg, sep);
+        njoins++;
     }
-    if (i < argc)
+    if (njoins > 0)
     {
-        append_format(stdout_buffer, L"%ls\n", argv[i]);
+        stdout_buffer.resize(stdout_buffer.length() - wcslen(sep));
+        stdout_buffer += L'\n';
     }
 
-    return BUILTIN_STRING_OK;
+    return (njoins > 0) ? 0 : 1;
 }
 
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
@@ -142,13 +223,20 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    for (int i = woptind; i < argc; i++)
+    int i = woptind;
+    const wchar_t *arg;
+    int nonempty = 0;
+    while ((arg = string_get_arg(&i, argv)) != 0)
     {
-        int len = wcslen(argv[i]);
-        append_format(stdout_buffer, L"%d\n", len);
+        size_t n = wcslen(arg);
+        if (n > 0)
+        {
+            nonempty++;
+        }
+        append_format(stdout_buffer, L"%d\n", int(n));
     }
 
-    return BUILTIN_STRING_OK;
+    return (nonempty > 0) ? 0 : 1;
 }
 
 static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
