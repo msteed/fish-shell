@@ -22,6 +22,7 @@
 // XXX split: default to splitting on whitespace?
 // XXX accept arguments from stdin if !isatty(stdin)
 // XXX string escape: support flags: ESCAPE_ALL, ESCAPE_NO_QUOTED, ESCAPE_NO_TILDE
+// XXX wrap string literals with _()
 
 enum
 {
@@ -31,24 +32,17 @@ enum
 
 static void string_fatal_error(const wchar_t *fmt, ...)
 {
-#if 0
-    // Don't error twice
-    if (early_exit)
-        return;
-#endif
-
     va_list va;
     va_start(va, fmt);
     wcstring errstr = vformat_string(fmt, va);
     va_end(va);
-    stderr_buffer.append(errstr);
-    if (! string_suffixes_string(L"\n", errstr))
-        stderr_buffer.push_back(L'\n');
 
-#if 0
-    this->exit_code = STATUS_BUILTIN_ERROR;
-    this->early_exit = true;
-#endif
+    if (!errstr.empty() && errstr.at(errstr.length() - 1) != L'\n')
+    {
+        errstr += L'\n';
+    }
+
+    stderr_buffer += errstr;
 }
 
 static const wchar_t *string_get_arg_stdin()
@@ -186,6 +180,12 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
     int njoins = 0;
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)
@@ -221,6 +221,12 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
             builtin_unknown_option(parser, argv[0], argv[woptind - 1]);
             return BUILTIN_STRING_ERROR;
         }
+    }
+
+    if (!isatty(builtin_stdin) && argc > woptind)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
     }
 
     int i = woptind;
