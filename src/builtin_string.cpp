@@ -1,28 +1,14 @@
 /** \file builtin_string.cpp
-  Functions for executing the string builtin.
+  Implementation of the string builtin.
 */
-#include "config.h"
 
-#include <stdlib.h>
-
-#include "fallback.h"
-#include "util.h"
-
-#include "wutil.h"
-#include "builtin.h"
-#include "parser.h"
-#include "common.h"
-//#include "wgetopt.h"
-
-// XXX support -q|--quiet in most commands
-// XXX verify test coverage including edge cases like empty strings
-// XXX documentation & help - finish & fix formatting
+// XXX support -q|--quiet in most (all?) commands
+// XXX finalize return values
+// XXX verify test coverage including options and edge cases like empty strings
+// XXX split: default to splitting on whitespace?
+// XXX documentation & help - finish & check formatting
 // XXX string_match --regex
 // XXX string_replace
-// XXX finalize & document return values
-// XXX split: default to splitting on whitespace?
-// XXX accept arguments from stdin if !isatty(stdin)
-// XXX wrap string literals with _()
 
 enum
 {
@@ -445,7 +431,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     {
         if (opt_regex)
         {
-            string_fatal_error(_(L"string match --regex: not yet implemented"));
+            string_fatal_error(L"string match --regex: not yet implemented");
             return BUILTIN_STRING_ERROR;
         }
         else
@@ -478,7 +464,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(_(L"string replace: not yet implemented"));
+    string_fatal_error(L"string replace: not yet implemented");
     return BUILTIN_STRING_ERROR;
 }
 
@@ -628,7 +614,7 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
                 length = int(wcstol(w.woptarg, 0, 10));
                 if (length < 0)
                 {
-                    string_fatal_error(L"%ls: Invalid length value\n", argv[0]);
+                    string_fatal_error(_(L"%ls: Invalid length value\n"), argv[0]);
                     return BUILTIN_STRING_ERROR;
                 }
                 break;
@@ -637,7 +623,7 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
                 start = int(wcstol(w.woptarg, 0, 10));
                 if (start == 0)
                 {
-                    string_fatal_error(L"%ls: Invalid start value\n", argv[0]);
+                    string_fatal_error(_(L"%ls: Invalid start value\n"), argv[0]);
                     return BUILTIN_STRING_ERROR;
                 }
                 break;
