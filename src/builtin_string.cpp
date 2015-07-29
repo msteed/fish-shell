@@ -682,6 +682,12 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
     return (nsub > 0) ? 0 : 1;
 }
 
+static int string_trim(parser_t &parser, int argc, wchar_t **argv)
+{
+    string_fatal_error(L"string trim: not yet implemented");
+    return BUILTIN_STRING_ERROR;
+}
+
 static const struct string_subcommand
 {
     const wchar_t *name;
@@ -696,6 +702,7 @@ string_subcommands[] =
     { L"replace", &string_replace },
     { L"split", &string_split },
     { L"sub", &string_sub },
+    { L"trim", &string_trim },
     { 0, 0 }
 };
 
