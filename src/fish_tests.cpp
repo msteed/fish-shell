@@ -3943,12 +3943,17 @@ static void test_string(void)
     }
     string_tests[] =
     {
-        { {L"string", L"escape", L"a", 0},                      0, L"a\n" },
+        { {L"string", L"escape", 0},                            1, L"" },
         { {L"string", L"escape", L"", 0},                       0, L"''\n" },
+        { {L"string", L"escape", L"-q", L"", 0},                0, L"\n" },
+        { {L"string", L"escape", L"a", 0},                      0, L"a\n" },
         { {L"string", L"escape", L"\x07", 0},                   0, L"\\cg\n" },
         { {L"string", L"escape", L"\"x\"", 0},                  0, L"'\"x\"'\n" },
         { {L"string", L"escape", L"hello world", 0},            0, L"'hello world'\n" },
+        { {L"string", L"escape", L"-q", L"hello world", 0},     0, L"hello\\ world\n" },
         { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
+        { {L"string", L"escape", L"-q", L"~", 0},               0, L"\\~\n" },
+        { {L"string", L"escape", L"-t", L"~", 0},               0, L"~\n" },
 
         { {L"string", L"join", 0},                              1, L"" },
         { {L"string", L"join", L"", 0},                         1, L"" },

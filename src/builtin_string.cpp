@@ -14,6 +14,7 @@
 #include "common.h"
 //#include "wgetopt.h"
 
+// XXX build: make builtin.o depend on this file, or maybe split this file out
 // XXX verify test coverage including edge cases like empty strings
 // XXX documentation & help - finish & fix formatting
 // XXX string_match --regex
@@ -21,7 +22,6 @@
 // XXX finalize & document return values
 // XXX split: default to splitting on whitespace?
 // XXX accept arguments from stdin if !isatty(stdin)
-// XXX string escape: support flags: ESCAPE_ALL, ESCAPE_NO_QUOTED, ESCAPE_NO_TILDE
 // XXX wrap string literals with _()
 
 enum
@@ -123,9 +123,15 @@ static inline const wchar_t *string_get_arg(int *argidx, wchar_t **argv)
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"";
-    const struct woption long_options[] = { 0, 0, 0, 0 };
+    const wchar_t *short_options = L"qt";
+    const struct woption long_options[] =
+    {
+        { L"no-quoted", no_argument, 0, 'q' },
+        { L"no-tilde", no_argument, 0, 't' },
+        { 0, 0, 0, 0 }
+    };
 
+    escape_flags_t flags = ESCAPE_ALL;
     wgetopter_t w;
     for (;;)
     {
@@ -135,26 +141,48 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
         {
             break;
         }
-        else if (c == '?')
+        switch (c)
         {
-            builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
-            return BUILTIN_STRING_ERROR;
+            case 0:
+                break;
+
+            case 'q':
+                flags |= ESCAPE_NO_QUOTED;
+                break;
+
+            case 't':
+                flags |= ESCAPE_NO_TILDE;
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
+                return BUILTIN_STRING_ERROR;
         }
     }
 
-    for (int i = w.woptind; i < argc; i++)
+    int i = w.woptind;
+    if (!isatty(builtin_stdin) && argc > i)
     {
-        wcstring escaped = escape(argv[i], ESCAPE_ALL);
-        append_format(stdout_buffer, L"%ls\n", escaped.c_str());
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
     }
 
-    return BUILTIN_STRING_OK;
+    int nesc = 0;
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
+    {
+        wcstring escaped = escape(arg, flags);
+        append_format(stdout_buffer, L"%ls\n", escaped.c_str());
+        nesc++;
+    }
+
+    return (nesc > 0) ? 0 : 1;
 }
 
 static int string_join(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"";
-    const struct woption long_options[] = { 0, 0, 0, 0 };
+    const struct woption long_options[] = { { 0, 0, 0, 0 } };
 
     wgetopter_t w;
     for (;;)
@@ -205,7 +233,7 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"";
-    const struct woption long_options[] = { 0, 0, 0, 0 };
+    const struct woption long_options[] = { { 0, 0, 0, 0 } };
 
     wgetopter_t w;
     for (;;)
@@ -349,7 +377,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         { L"index", no_argument, 0, 'n'},
         { L"query", no_argument, 0, 'q'},
         { L"regex", no_argument, 0, 'r'},
-        0, 0, 0, 0
+        { 0, 0, 0, 0 }
     };
 
     bool opt_all = false;
@@ -452,7 +480,7 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     {
         { L"max", required_argument, 0, 'm'},
         { L"right", no_argument, 0, 'r'},
-        0, 0, 0, 0
+        { 0, 0, 0, 0 }
     };
 
     int max = 0;
@@ -561,7 +589,7 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
     {
         { L"length", required_argument, 0, 'l'},
         { L"start", required_argument, 0, 's'},
-        0, 0, 0, 0
+        { 0, 0, 0, 0 }
     };
 
     int start = 0;
