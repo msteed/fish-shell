@@ -885,7 +885,7 @@ obj/builtin.o: src/history.h src/wcstringutil.h src/builtin_set.cpp
 obj/builtin.o: src/builtin_commandline.cpp src/builtin_complete.cpp
 obj/builtin.o: src/builtin_ulimit.cpp src/builtin_jobs.cpp
 obj/builtin.o: src/builtin_set_color.cpp src/output.h src/screen.h
-obj/builtin.o: src/builtin_printf.cpp
+obj/builtin.o: src/builtin_printf.cpp src/builtin_string.cpp
 obj/builtin_test.o: config.h src/common.h src/util.h src/builtin.h src/io.h
 obj/builtin_test.o: src/wutil.h src/proc.h src/signal.h src/parse_tree.h
 obj/builtin_test.o: src/tokenizer.h src/parse_constants.h
@@ -973,6 +973,9 @@ obj/history.o: src/complete.h src/highlight.h src/env.h src/color.h
 obj/history.o: src/parse_constants.h src/parse_tree.h src/wutil.h
 obj/history.o: src/history.h src/intern.h src/path.h src/autoload.h src/lru.h
 obj/history.o: src/iothread.h
+obj/input_common.o: config.h src/fallback.h src/signal.h src/util.h
+obj/input_common.o: src/common.h src/wutil.h src/input_common.h
+obj/input_common.o: src/env_universal_common.h src/env.h src/iothread.h
 obj/input.o: config.h src/signal.h src/fallback.h src/util.h src/wutil.h
 obj/input.o: src/common.h src/reader.h src/io.h src/complete.h
 obj/input.o: src/highlight.h src/env.h src/color.h src/parse_constants.h
@@ -980,9 +983,6 @@ obj/input.o: src/proc.h src/parse_tree.h src/tokenizer.h src/sanity.h
 obj/input.o: src/input_common.h src/input.h src/parser.h src/event.h
 obj/input.o: src/function.h src/expand.h src/output.h src/screen.h
 obj/input.o: src/intern.h
-obj/input_common.o: config.h src/fallback.h src/signal.h src/util.h
-obj/input_common.o: src/common.h src/wutil.h src/input_common.h
-obj/input_common.o: src/env_universal_common.h src/env.h src/iothread.h
 obj/intern.o: config.h src/fallback.h src/signal.h src/util.h src/wutil.h
 obj/intern.o: src/common.h src/intern.h
 obj/io.o: config.h src/fallback.h src/signal.h src/util.h src/wutil.h
@@ -1012,16 +1012,6 @@ obj/parse_execution.o: src/wutil.h src/exec.h src/path.h
 obj/parse_productions.o: src/parse_productions.h src/parse_tree.h config.h
 obj/parse_productions.o: src/util.h src/common.h src/tokenizer.h
 obj/parse_productions.o: src/parse_constants.h
-obj/parse_tree.o: src/parse_productions.h src/parse_tree.h config.h
-obj/parse_tree.o: src/util.h src/common.h src/tokenizer.h
-obj/parse_tree.o: src/parse_constants.h src/fallback.h src/signal.h
-obj/parse_tree.o: src/wutil.h src/proc.h src/io.h src/expand.h
-obj/parse_util.o: config.h src/fallback.h src/signal.h src/util.h src/wutil.h
-obj/parse_util.o: src/common.h src/tokenizer.h src/parse_util.h
-obj/parse_util.o: src/autoload.h src/lru.h src/parse_tree.h
-obj/parse_util.o: src/parse_constants.h src/expand.h src/intern.h src/exec.h
-obj/parse_util.o: src/proc.h src/io.h src/env.h src/wildcard.h src/complete.h
-obj/parse_util.o: src/parser.h src/event.h src/function.h src/builtin.h
 obj/parser.o: config.h src/fallback.h src/signal.h src/util.h src/common.h
 obj/parser.o: src/wutil.h src/proc.h src/io.h src/parse_tree.h
 obj/parser.o: src/tokenizer.h src/parse_constants.h src/parser.h src/event.h
@@ -1032,6 +1022,16 @@ obj/parser.o: src/intern.h src/parse_util.h src/autoload.h src/lru.h
 obj/parser.o: src/path.h src/parse_execution.h
 obj/parser_keywords.o: config.h src/fallback.h src/signal.h src/common.h
 obj/parser_keywords.o: src/util.h src/parser_keywords.h
+obj/parse_tree.o: src/parse_productions.h src/parse_tree.h config.h
+obj/parse_tree.o: src/util.h src/common.h src/tokenizer.h
+obj/parse_tree.o: src/parse_constants.h src/fallback.h src/signal.h
+obj/parse_tree.o: src/wutil.h src/proc.h src/io.h src/expand.h
+obj/parse_util.o: config.h src/fallback.h src/signal.h src/util.h src/wutil.h
+obj/parse_util.o: src/common.h src/tokenizer.h src/parse_util.h
+obj/parse_util.o: src/autoload.h src/lru.h src/parse_tree.h
+obj/parse_util.o: src/parse_constants.h src/expand.h src/intern.h src/exec.h
+obj/parse_util.o: src/proc.h src/io.h src/env.h src/wildcard.h src/complete.h
+obj/parse_util.o: src/parser.h src/event.h src/function.h src/builtin.h
 obj/path.o: config.h src/fallback.h src/signal.h src/util.h src/common.h
 obj/path.o: src/env.h src/wutil.h src/path.h src/expand.h
 obj/path.o: src/parse_constants.h

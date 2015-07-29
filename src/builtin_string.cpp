@@ -14,7 +14,7 @@
 #include "common.h"
 //#include "wgetopt.h"
 
-// XXX build: make builtin.o depend on this file, or maybe split this file out
+// XXX support -q|--quiet in most commands
 // XXX verify test coverage including edge cases like empty strings
 // XXX documentation & help - finish & fix formatting
 // XXX string_match --regex
@@ -251,13 +251,13 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    if (!isatty(builtin_stdin) && argc > w.woptind)
+    int i = w.woptind;
+    if (!isatty(builtin_stdin) && argc > i)
     {
         string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
         return BUILTIN_STRING_ERROR;
     }
 
-    int i = w.woptind;
     const wchar_t *arg;
     int nonempty = 0;
     while ((arg = string_get_arg(&i, argv)) != 0)
@@ -369,21 +369,21 @@ static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string,
 
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"ainqr";
+    const wchar_t *short_options = L"im:nqr";
     const struct woption long_options[] =
     {
-        { L"all", no_argument, 0, 'a'},
         { L"ignore-case", no_argument, 0, 'i'},
         { L"index", no_argument, 0, 'n'},
-        { L"query", no_argument, 0, 'q'},
+        { L"max", required_argument, 0, 'm'},
+        { L"quiet", no_argument, 0, 'q'},
         { L"regex", no_argument, 0, 'r'},
         { 0, 0, 0, 0 }
     };
 
-    bool opt_all = false;
+    int max = -1;
     bool opt_ignore_case = false;
     bool opt_index = false;
-    bool opt_query = false;
+    bool opt_quiet = false;
     bool opt_regex = false;
     wgetopter_t w;
     for (;;)
@@ -399,12 +399,12 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             case 0:
                 break;
 
-            case 'a':
-                opt_all = true;
-                break;
-
             case 'i':
                 opt_ignore_case = true;
+                break;
+
+            case 'm':
+                max = int(wcstol(w.woptarg, 0, 10));
                 break;
 
             case 'n':
@@ -412,7 +412,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'q':
-                opt_query = true;
+                opt_quiet = true;
                 break;
 
             case 'r':
@@ -426,10 +426,22 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     }
 
     int i = w.woptind;
-    wchar_t *pattern = argv[i++];
-    int args = argc - i;
-    int matches = 0;
-    for (; i < argc; i++)
+    const wchar_t *pattern;
+    if ((pattern = string_get_arg_argv(&i, argv)) == 0)
+    {
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    int nmatches = 0;
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
     {
         if (opt_regex)
         {
@@ -438,33 +450,30 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         }
         else
         {
-            bool match = string_match_wildcard(pattern, argv[i], opt_ignore_case);
+            bool match = string_match_wildcard(pattern, arg, opt_ignore_case);
             if (match)
             {
-                matches++;
+                nmatches++;
             }
-            if (!opt_query)
+            if (!opt_quiet)
             {
                 if (opt_index)
                 {
-                    if (match || opt_all)
-                    {
-                        append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
-                    }
+                    append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
                 }
                 else if (match)
                 {
-                    append_format(stdout_buffer, L"%ls\n", argv[i]);
+                    append_format(stdout_buffer, L"%ls\n", arg);
                 }
             }
-            if (match && !opt_all)
+            if (max >= 0 && nmatches >= max)
             {
                 break;
             }
         }
     }
 
-    return opt_all ? (matches < args) : (matches == 0);
+    return (nmatches > 0) ? 0 : 1;
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
@@ -517,26 +526,33 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    if (argc < w.woptind + 1)
+    int i = w.woptind;
+    const wchar_t *sep;
+    if ((sep = string_get_arg_argv(&i, argv)) == 0)
     {
         string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
         return BUILTIN_STRING_ERROR;
     }
 
-    int i = w.woptind;
-    const wchar_t *sep = argv[i++];
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
     int seplen = wcslen(sep);
     int scount = 0;
+    const wchar_t *arg;
     if (right)
     {
-        for (; i < argc; i++)
+        while ((arg = string_get_arg(&i, argv)) != 0)
         {
             std::list<wcstring> splits;
-            wchar_t *end = argv[i] + wcslen(argv[i]);
-            wchar_t *cur = end - seplen;
+            const wchar_t *end = arg + wcslen(arg);
+            const wchar_t *cur = end - seplen;
             if (seplen > 0)
             {
-                while (cur >= argv[i] && (max == 0 || scount < max))
+                while (cur >= arg && (max == 0 || scount < max))
                 {
                     if (wcsncmp(cur, sep, seplen) == 0)
                     {
@@ -546,7 +562,7 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
                     }
                     cur--;
                 }
-                splits.push_front(wcstring(argv[i], end - argv[i]).c_str());
+                splits.push_front(wcstring(arg, end - arg).c_str());
             }
             std::list<wcstring>::const_iterator si = splits.begin();
             while (si != splits.end())
@@ -558,12 +574,12 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     }
     else
     {
-        for (; i < argc; i++)
+        while ((arg = string_get_arg(&i, argv)) != 0)
         {
-            wchar_t *cur = argv[i];
+            const wchar_t *cur = arg;
             while (cur != 0)
             {
-                wchar_t *ptr = (seplen == 0 || (max > 0 && scount >= max)) ? 0 : wcsstr(cur, sep);
+                const wchar_t *ptr = (seplen == 0 || (max > 0 && scount >= max)) ? 0 : wcsstr(cur, sep);
                 if (ptr == 0)
                 {
                     append_format(stdout_buffer, L"%ls\n", cur);
@@ -636,12 +652,20 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    int result = 0;
-    for (int i = w.woptind; i < argc; i++)
+    int i = w.woptind;
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    int nsub = 0;
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
     {
         wcstring::size_type pos = 0;
         wcstring::size_type count = wcstring::npos;
-        wcstring s(argv[i]);
+        wcstring s(arg);
         if (start > 0)
         {
             pos = start - 1;
@@ -649,26 +673,27 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
         else if (start < 0)
         {
             wcstring::size_type n = -start;
-            pos = n > s.size() ? 0 : s.size() - n;
+            pos = n > s.length() ? 0 : s.length() - n;
         }
-        if (pos > s.size())
+        if (pos > s.length())
         {
-            pos = s.size();
+            pos = s.length();
         }
 
         if (length >= 0)
         {
             count = length;
         }
-        if (pos + count > s.size())
+        if (pos + count > s.length())
         {
             count = wcstring::npos;
         }
 
         append_format(stdout_buffer, L"%ls\n", s.substr(pos, count).c_str());
+        nsub++;
     }
 
-    return result;
+    return (nsub > 0) ? 0 : 1;
 }
 
 static const struct string_subcommand
