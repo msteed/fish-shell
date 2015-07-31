@@ -7,8 +7,7 @@
 //      match -n: docs: index is actually a match/nomatch result
 //      match -r -n: need index to return start & end indices
 //      split: default to splitting on whitespace?
-//      split: split individual characters if SEP is empty
-// XXX verify test coverage including options and edge cases like empty strings
+//      split: split on individual characters if SEP is empty?
 // XXX documentation & help - finish & check formatting
 // XXX string_match --regex
 // XXX string_replace
@@ -272,13 +271,13 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
     }
 
     const wchar_t *arg;
-    int nonempty = 0;
+    int nnonempty = 0;
     while ((arg = string_get_arg(&i, argv)) != 0)
     {
         size_t n = wcslen(arg);
         if (n > 0)
         {
-            nonempty++;
+            nnonempty++;
         }
         if (!quiet)
         {
@@ -286,7 +285,7 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         }
     }
 
-    return (nonempty > 0) ? 0 : 1;
+    return (nnonempty > 0) ? 0 : 1;
 }
 
 static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
@@ -742,8 +741,91 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_trim(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(L"string trim: not yet implemented");
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L"c:lqr";
+    const struct woption long_options[] =
+    {
+        { L"chars", required_argument, 0, 'c'},
+        { L"left", no_argument, 0, 'l'},
+        { L"quiet", no_argument, 0, 'q'},
+        { L"right", no_argument, 0, 'r'},
+        { 0, 0, 0, 0 }
+    };
+
+    int which = 0;
+    bool quiet = false;
+    wcstring chars = L" \n\t";
+    wgetopter_t w;
+    for (;;)
+    {
+        int c = w.wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        switch (c)
+        {
+            case 0:
+                break;
+
+            case 'c':
+                chars = w.woptarg;
+                break;
+
+            case 'l':
+                which |= 1;
+                break;
+
+            case 'q':
+                quiet = true;
+                break;
+
+            case 'r':
+                which |= 2;
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
+                return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    int i = w.woptind;
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    const wchar_t *arg;
+    int ntrim = 0;
+    while ((arg = string_get_arg(&i, argv)) != 0)
+    {
+        const wchar_t *begin = arg;
+        const wchar_t *end = arg + wcslen(arg);
+        if (!which || (which & 1))
+        {
+            while (begin != end && chars.find_first_of(begin, 0, 1) != wcstring::npos)
+            {
+                begin++;
+                ntrim++;
+            }
+        }
+        if (!which || (which & 2))
+        {
+            while (begin != end && chars.find_first_of(end - 1, 0, 1) != wcstring::npos)
+            {
+                end--;
+                ntrim++;
+            }
+        }
+        if (!quiet)
+        {
+            append_format(stdout_buffer, L"%ls\n", wcstring(begin, end - begin).c_str());
+        }
+    }
+
+    return (ntrim > 0) ? 0 : 1;
 }
 
 static const struct string_subcommand

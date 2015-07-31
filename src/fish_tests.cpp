@@ -4073,7 +4073,28 @@ static void test_string(void)
         { {L"string", L"sub", L"-q", 0},                        1, L"" },
         { {L"string", L"sub", L"-q", L"abcde", 0},              0, L""},
 
-        // XXX string trim
+        { {L"string", L"trim", 0},                              1, L""},
+        { {L"string", L"trim", L""},                            1, L"\n"},
+        { {L"string", L"trim", L" "},                           0, L"\n"},
+        { {L"string", L"trim", L" a"},                          0, L"a\n"},
+        { {L"string", L"trim", L"a "},                          0, L"a\n"},
+        { {L"string", L"trim", L" a "},                         0, L"a\n"},
+        { {L"string", L"trim", L"-l", L" a"},                   0, L"a\n"},
+        { {L"string", L"trim", L"-l", L"a "},                   1, L"a \n"},
+        { {L"string", L"trim", L"-l", L" a "},                  0, L"a \n"},
+        { {L"string", L"trim", L"-r", L" a"},                   1, L" a\n"},
+        { {L"string", L"trim", L"-r", L"a "},                   0, L"a\n"},
+        { {L"string", L"trim", L"-r", L" a "},                  0, L" a\n"},
+        { {L"string", L"trim", L"-c", L".", L" a"},             1, L" a\n"},
+        { {L"string", L"trim", L"-c", L".", L"a "},             1, L"a \n"},
+        { {L"string", L"trim", L"-c", L".", L" a "},            1, L" a \n"},
+        { {L"string", L"trim", L"-c", L".", L".a"},             0, L"a\n"},
+        { {L"string", L"trim", L"-c", L".", L"a."},             0, L"a\n"},
+        { {L"string", L"trim", L"-c", L".", L".a."},            0, L"a\n"},
+        { {L"string", L"trim", L"-c", L"\\/", L"/a\\"},         0, L"a\n"},
+        { {L"string", L"trim", L"-c", L"\\/", L"a/"},           0, L"a\n"},
+        { {L"string", L"trim", L"-c", L"\\/", L"\\a/"},         0, L"a\n"},
+        { {L"string", L"trim", L"-c", L"", L".a."},             1, L".a.\n"},
 
         { {0}, 0, 0 }
     };
