@@ -2,14 +2,13 @@
   Implementation of the string builtin.
 */
 
-// XXX support -q|--quiet in most (all?) commands
 // XXX consider changes to commands
 //      index [(-r|--right)] - simple substring match
 //      match -n: docs: index is actually a match/nomatch result
 //      match -r -n: need index to return start & end indices
-// XXX finalize return values
+//      split: default to splitting on whitespace?
+//      split: split individual characters if SEP is empty
 // XXX verify test coverage including options and edge cases like empty strings
-// XXX split: default to splitting on whitespace?
 // XXX documentation & help - finish & check formatting
 // XXX string_match --regex
 // XXX string_replace
@@ -582,8 +581,12 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
                         splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
                         end = cur;
                         nsplit++;
+                        cur -= seplen;
                     }
-                    cur--;
+                    else
+                    {
+                        cur--;
+                    }
                 }
                 splits.push_front(wcstring(arg, end - arg).c_str());
             }
