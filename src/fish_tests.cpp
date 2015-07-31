@@ -3945,15 +3945,14 @@ static void test_string(void)
     {
         { {L"string", L"escape", 0},                            1, L"" },
         { {L"string", L"escape", L"", 0},                       0, L"''\n" },
-        { {L"string", L"escape", L"-q", L"", 0},                0, L"\n" },
+        { {L"string", L"escape", L"-n", L"", 0},                0, L"\n" },
         { {L"string", L"escape", L"a", 0},                      0, L"a\n" },
         { {L"string", L"escape", L"\x07", 0},                   0, L"\\cg\n" },
         { {L"string", L"escape", L"\"x\"", 0},                  0, L"'\"x\"'\n" },
         { {L"string", L"escape", L"hello world", 0},            0, L"'hello world'\n" },
-        { {L"string", L"escape", L"-q", L"hello world", 0},     0, L"hello\\ world\n" },
+        { {L"string", L"escape", L"-n", L"hello world", 0},     0, L"hello\\ world\n" },
         { {L"string", L"escape", L"hello", L"world", 0},        0, L"hello\nworld\n" },
-        { {L"string", L"escape", L"-q", L"~", 0},               0, L"\\~\n" },
-        { {L"string", L"escape", L"-t", L"~", 0},               0, L"~\n" },
+        { {L"string", L"escape", L"-n", L"~", 0},               0, L"\\~\n" },
 
         { {L"string", L"join", 0},                              1, L"" },
         { {L"string", L"join", L"", 0},                         1, L"" },
@@ -3963,13 +3962,23 @@ static void test_string(void)
         { {L"string", L"join", L"/", L"usr", 0},                0, L"usr\n" },
         { {L"string", L"join", L"/", L"usr", L"local", L"bin", 0}, 0, L"usr/local/bin\n" },
         { {L"string", L"join", L"...", L"3", L"2", L"1", 0},    0, L"3...2...1\n" },
+        { {L"string", L"join", L"-q", 0},                       1, L"" },
+        { {L"string", L"join", L"-q", L".", 0},                 1, L"" },
+        { {L"string", L"join", L"-q", L".", L".", 0},           0, L"" },
 
+        { {L"string", L"length", 0},                            1, L"" },
         { {L"string", L"length", L"", 0},                       1, L"0\n" },
         { {L"string", L"length", L"", L"", L"", 0},             1, L"0\n0\n0\n" },
         { {L"string", L"length", L"a", 0},                      0, L"1\n" },
         { {L"string", L"length", L"\U0002008A", 0},             0, L"1\n" },
         { {L"string", L"length", L"um", L"dois", L"três", 0},   0, L"2\n4\n4\n" },
+        { {L"string", L"length", L"um", L"dois", L"três", 0},   0, L"2\n4\n4\n" },
+        { {L"string", L"length", L"-q", 0},                     1, L"" },
+        { {L"string", L"length", L"-q", L"", 0},                1, L"" },
+        { {L"string", L"length", L"-q", L"a", 0},               0, L"" },
 
+        { {L"string", L"match", 0},                             1, L"" },
+        { {L"string", L"match", L"", 0},                        1, L"" },
         { {L"string", L"match", L"", L"", 0},                   0, L"\n" },
         { {L"string", L"match", L"?", L"a", 0},                 0, L"a\n" },
         { {L"string", L"match", L"*", L"", 0},                  0, L"\n" },
@@ -4010,25 +4019,32 @@ static void test_string(void)
         { {L"string", L"match", L"a*b", L"axxbc", 0},           1, L"" },
         { {L"string", L"match", L"*b", L"bbba", 0},             1, L"" },
         { {L"string", L"match", L"0x[0-9a-fA-F][0-9a-fA-F]", L"0xbad", 0}, 1, L"" },
-        // XXX string match -a
-        // XXX string match -n
-        // XXX string match -a -n
-        // XXX string match -q
-        // XXX string match -a -q
+
+        { {L"string", L"match", L"*", L"ab", L"cde", 0},        0, L"ab\ncde\n" },
+        { {L"string", L"match", L"-m1", L"*", L"ab", L"cde", 0}, 0, L"ab\n" },
+        { {L"string", L"match", L"-n", L"a*", L"ab", L"cde", 0}, 0, L"1\n0\n" },
+        { {L"string", L"match", L"-n", L"-m1", L"a*", L"ab", L"cde", 0}, 0, L"1\n" },
+        { {L"string", L"match", L"-n", L"-m1", L"c*", L"ab", L"cde", 0}, 0, L"0\n1\n" },
+        { {L"string", L"match", L"-q", L"a*", L"b", L"c", 0},   1, L"" },
+        { {L"string", L"match", L"-q", L"a*", L"b", L"a", 0},   0, L"" },
+
         // XXX string match -r ...
 
         // XXX string replace
 
         { {L"string", L"split", 0},                             1, L"" },
-        { {L"string", L"split", L":", 0},                       0, L"" },
+        { {L"string", L"split", L":", 0},                       1, L"" },
         { {L"string", L"split", L".", L"www.ch.ic.ac.uk", 0},   0, L"www\nch\nic\nac\nuk\n" },
         { {L"string", L"split", L"-m0", L"/", L"/usr/local/bin/fish", 0}, 0, L"\nusr\nlocal\nbin\nfish\n" },
         { {L"string", L"split", L"-m2", L":", L"a:b", L"c:d", L"e:f", 0}, 0, L"a\nb\nc\nd\ne:f\n" },
         { {L"string", L"split", L"-m1", L"-r", L"/", L"/usr/local/bin/fish", 0}, 0, L"/usr/local/bin\nfish\n" },
         { {L"string", L"split", L"--", L"--", L"a--b---c----d", 0}, 0, L"a\nb\n-c\n\nd\n" },
-        { {L"string", L"split", L"", L"abc", 0},                0, L"abc\n" },
+        { {L"string", L"split", L"", L"abc", 0},                1, L"abc\n" },
+        { {L"string", L"split", L"-q", 0},                      1, L"" },
+        { {L"string", L"split", L"-q", L":", 0},                1, L"" },
+        { {L"string", L"split", L"-q", L"x", L"axbxc", 0},      0, L"" },
 
-        { {L"string", L"sub", 0},                               0, L"" },
+        { {L"string", L"sub", 0},                               1, L"" },
         { {L"string", L"sub", L"abcde", 0},                     0, L"abcde\n"},
         { {L"string", L"sub", L"-l0", L"abcde", 0},             0, L"\n"},
         { {L"string", L"sub", L"-l2", L"abcde", 0},             0, L"ab\n"},
@@ -4049,6 +4065,10 @@ static void test_string(void)
         { {L"string", L"sub", L"-s-1", L"-l2", L"abcde", 0},    0, L"e\n"},
         { {L"string", L"sub", L"-s-3", L"-l2", L"abcde", 0},    0, L"cd\n"},
         { {L"string", L"sub", L"-s-3", L"-l4", L"abcde", 0},    0, L"cde\n"},
+        { {L"string", L"sub", L"-q", 0},                        1, L"" },
+        { {L"string", L"sub", L"-q", L"abcde", 0},              0, L""},
+
+        // XXX string trim
 
         { {0}, 0, 0 }
     };

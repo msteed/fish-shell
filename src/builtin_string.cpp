@@ -3,6 +3,10 @@
 */
 
 // XXX support -q|--quiet in most (all?) commands
+// XXX consider changes to commands
+//      index [(-r|--right)] - simple substring match
+//      match -n: docs: index is actually a match/nomatch result
+//      match -r -n: need index to return start & end indices
 // XXX finalize return values
 // XXX verify test coverage including options and edge cases like empty strings
 // XXX split: default to splitting on whitespace?
@@ -109,11 +113,10 @@ static inline const wchar_t *string_get_arg(int *argidx, wchar_t **argv)
 
 static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"qt";
+    const wchar_t *short_options = L"n";
     const struct woption long_options[] =
     {
-        { L"no-quoted", no_argument, 0, 'q' },
-        { L"no-tilde", no_argument, 0, 't' },
+        { L"no-quoted", no_argument, 0, 'n' },
         { 0, 0, 0, 0 }
     };
 
@@ -132,12 +135,8 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
             case 0:
                 break;
 
-            case 'q':
+            case 'n':
                 flags |= ESCAPE_NO_QUOTED;
-                break;
-
-            case 't':
-                flags |= ESCAPE_NO_TILDE;
                 break;
 
             case '?':
@@ -167,9 +166,14 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_join(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"";
-    const struct woption long_options[] = { { 0, 0, 0, 0 } };
+    const wchar_t *short_options = L"q";
+    const struct woption long_options[] =
+    {
+        { L"quiet", no_argument, 0, 'q'},
+        { 0, 0, 0, 0 }
+    };
 
+    bool quiet = false;
     wgetopter_t w;
     for (;;)
     {
@@ -179,10 +183,18 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         {
             break;
         }
-        else if (c == '?')
+        switch (c)
         {
-            builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
-            return BUILTIN_STRING_ERROR;
+            case 0:
+                break;
+
+            case 'q':
+                quiet = true;
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
+                return BUILTIN_STRING_ERROR;
         }
     }
 
@@ -200,27 +212,35 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    int njoins = 0;
+    int njoin = 0;
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)
     {
-        append_format(stdout_buffer, L"%ls%ls", arg, sep);
-        njoins++;
+        if (!quiet)
+        {
+            append_format(stdout_buffer, L"%ls%ls", arg, sep);
+        }
+        njoin++;
     }
-    if (njoins > 0)
+    if (njoin > 0 && !quiet)
     {
         stdout_buffer.resize(stdout_buffer.length() - wcslen(sep));
         stdout_buffer += L'\n';
     }
 
-    return (njoins > 0) ? 0 : 1;
+    return (njoin > 0) ? 0 : 1;
 }
 
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"";
-    const struct woption long_options[] = { { 0, 0, 0, 0 } };
+    const wchar_t *short_options = L"q";
+    const struct woption long_options[] =
+    {
+        { L"quiet", no_argument, 0, 'q'},
+        { 0, 0, 0, 0 }
+    };
 
+    bool quiet = false;
     wgetopter_t w;
     for (;;)
     {
@@ -230,10 +250,18 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         {
             break;
         }
-        else if (c == '?')
+        switch (c)
         {
-            builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
-            return BUILTIN_STRING_ERROR;
+            case 0:
+                break;
+
+            case 'q':
+                quiet = true;
+                break;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
+                return BUILTIN_STRING_ERROR;
         }
     }
 
@@ -253,7 +281,10 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         {
             nonempty++;
         }
-        append_format(stdout_buffer, L"%d\n", int(n));
+        if (!quiet)
+        {
+            append_format(stdout_buffer, L"%d\n", int(n));
+        }
     }
 
     return (nonempty > 0) ? 0 : 1;
@@ -425,7 +456,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    int nmatches = 0;
+    int nmatch = 0;
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)
     {
@@ -439,7 +470,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             bool match = string_match_wildcard(pattern, arg, opt_ignore_case);
             if (match)
             {
-                nmatches++;
+                nmatch++;
             }
             if (!opt_quiet)
             {
@@ -452,14 +483,14 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                     append_format(stdout_buffer, L"%ls\n", arg);
                 }
             }
-            if (max >= 0 && nmatches >= max)
+            if (max >= 0 && nmatch >= max)
             {
                 break;
             }
         }
     }
 
-    return (nmatches > 0) ? 0 : 1;
+    return (nmatch > 0) ? 0 : 1;
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
@@ -470,15 +501,17 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L":m:r";
+    const wchar_t *short_options = L":m:qr";
     const struct woption long_options[] =
     {
         { L"max", required_argument, 0, 'm'},
+        { L"quiet", no_argument, 0, 'q'},
         { L"right", no_argument, 0, 'r'},
         { 0, 0, 0, 0 }
     };
 
     int max = 0;
+    bool quiet = false;
     bool right = false;
     wgetopter_t w;
     for (;;)
@@ -496,6 +529,10 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
 
             case 'm':
                 max = int(wcstol(w.woptarg, 0, 10));
+                break;
+
+            case 'q':
+                quiet = true;
                 break;
 
             case 'r':
@@ -527,7 +564,7 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     }
 
     int seplen = wcslen(sep);
-    int scount = 0;
+    int nsplit = 0;
     const wchar_t *arg;
     if (right)
     {
@@ -538,13 +575,13 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             const wchar_t *cur = end - seplen;
             if (seplen > 0)
             {
-                while (cur >= arg && (max == 0 || scount < max))
+                while (cur >= arg && (max == 0 || nsplit < max))
                 {
                     if (wcsncmp(cur, sep, seplen) == 0)
                     {
                         splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
                         end = cur;
-                        scount++;
+                        nsplit++;
                     }
                     cur--;
                 }
@@ -553,7 +590,10 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             std::list<wcstring>::const_iterator si = splits.begin();
             while (si != splits.end())
             {
-                append_format(stdout_buffer, L"%ls\n", (*si).c_str());
+                if (!quiet)
+                {
+                    append_format(stdout_buffer, L"%ls\n", (*si).c_str());
+                }
                 si++;
             }
         }
@@ -565,37 +605,45 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             const wchar_t *cur = arg;
             while (cur != 0)
             {
-                const wchar_t *ptr = (seplen == 0 || (max > 0 && scount >= max)) ? 0 : wcsstr(cur, sep);
+                const wchar_t *ptr = (seplen == 0 || (max > 0 && nsplit >= max)) ? 0 : wcsstr(cur, sep);
                 if (ptr == 0)
                 {
-                    append_format(stdout_buffer, L"%ls\n", cur);
+                    if (!quiet)
+                    {
+                        append_format(stdout_buffer, L"%ls\n", cur);
+                    }
                     cur = 0;
                 }
                 else
                 {
-                    append_format(stdout_buffer, L"%ls\n", wcstring(cur, ptr - cur).c_str());
+                    if (!quiet)
+                    {
+                        append_format(stdout_buffer, L"%ls\n", wcstring(cur, ptr - cur).c_str());
+                    }
                     cur = ptr + seplen;
-                    scount++;
+                    nsplit++;
                 }
             }
         }
     }
 
-    return BUILTIN_STRING_OK;
+    return (nsplit > 0) ? 0 : 1;
 }
 
 static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L":l:s:";
+    const wchar_t *short_options = L":l:qs:";
     const struct woption long_options[] =
     {
         { L"length", required_argument, 0, 'l'},
+        { L"quiet", required_argument, 0, 'q'},
         { L"start", required_argument, 0, 's'},
         { 0, 0, 0, 0 }
     };
 
     int start = 0;
     int length = -1;
+    bool quiet = false;
     wgetopter_t w;
     for (;;)
     {
@@ -617,6 +665,10 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
                     string_fatal_error(_(L"%ls: Invalid length value\n"), argv[0]);
                     return BUILTIN_STRING_ERROR;
                 }
+                break;
+
+            case 'q':
+                quiet = true;
                 break;
 
             case 's':
@@ -675,7 +727,10 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
             count = wcstring::npos;
         }
 
-        append_format(stdout_buffer, L"%ls\n", s.substr(pos, count).c_str());
+        if (!quiet)
+        {
+            append_format(stdout_buffer, L"%ls\n", s.substr(pos, count).c_str());
+        }
         nsub++;
     }
 
