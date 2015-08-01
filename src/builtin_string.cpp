@@ -3,10 +3,9 @@
 */
 
 // XXX consider changes to commands
-//      index [(-r|--right)] - simple substring match
-//      match -n: docs: index is actually a match/nomatch result
 //      match -r -n: need index to report start & end indices
 //      split: split on individual characters if SEP is empty?
+// XXX match -n: docs: index is actually a match/nomatch result
 // XXX documentation & help - finish & check formatting
 // XXX string_match --regex
 // XXX string_replace
