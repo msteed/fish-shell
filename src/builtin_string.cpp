@@ -752,7 +752,7 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
 
     int which = 0;
     bool quiet = false;
-    wcstring chars = L" \n\t";
+    wcstring chars = L" \f\n\r\t";
     wgetopter_t w;
     for (;;)
     {

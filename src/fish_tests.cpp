@@ -4076,6 +4076,7 @@ static void test_string(void)
         { {L"string", L"trim", 0},                              1, L""},
         { {L"string", L"trim", L""},                            1, L"\n"},
         { {L"string", L"trim", L" "},                           0, L"\n"},
+        { {L"string", L"trim", L"  \f\n\r\t"},                  0, L"\n"},
         { {L"string", L"trim", L" a"},                          0, L"a\n"},
         { {L"string", L"trim", L"a "},                          0, L"a\n"},
         { {L"string", L"trim", L" a "},                         0, L"a\n"},
