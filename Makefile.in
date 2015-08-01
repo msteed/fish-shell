@@ -50,6 +50,14 @@ docdir = @docdir@
 localedir = @localedir@
 
 #
+# pcre2
+#
+
+PCRE2_DIR = pcre2-10.20
+PCRE2_LIBDIR = $(PCRE2_DIR)/.libs
+PCRE2_LIB = $(PCRE2_LIBDIR)/libpcre2-32.a
+
+#
 # Various flags
 #
 
@@ -57,8 +65,10 @@ MACROS = -DLOCALEDIR=\"$(localedir)\" -DPREFIX=L\"$(prefix)\" -DDATADIR=L\"$(dat
 CXXFLAGS = @CXXFLAGS@ -iquote. -iquote./src/ $(MACROS) $(EXTRA_CXXFLAGS)
 CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
+PCRE2 = pcre2-10.20
+LDFLAGS_PCRE2 = -L$(PCRE2_LIBDIR) -lpcre2-32
 LIBS = @LIBS@
-LDFLAGS_FISH = ${LDFLAGS} @LDFLAGS_FISH@
+LDFLAGS_FISH = ${LDFLAGS} $(LDFLAGS_PCRE2) @LDFLAGS_FISH@
 
 #
 # Set to 1 if we have gettext
@@ -778,9 +788,11 @@ obj:
 # Build the fish program.
 #
 
-fish: $(FISH_OBJS) obj/fish.o
+fish: $(FISH_OBJS) obj/fish.o $(PCRE2_LIB)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS_FISH) $(FISH_OBJS) obj/fish.o $(LIBS) -o $@
 
+$(PCRE2_LIB):
+	(cd $(PCRE2_DIR); ./configure --disable-pcre2-8 --enable-pcre2-32 --disable-shared; make)
 
 #
 # Build the fish_tests program.
