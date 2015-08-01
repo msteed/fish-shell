@@ -54,6 +54,7 @@ localedir = @localedir@
 #
 
 PCRE2_DIR = pcre2-10.20
+PCRE2_CXXFLAGS = -I$(PCRE2_DIR)/src
 PCRE2_LIBDIR = $(PCRE2_DIR)/.libs
 PCRE2_LIB = $(PCRE2_LIBDIR)/libpcre2-32.a
 
@@ -62,13 +63,13 @@ PCRE2_LIB = $(PCRE2_LIBDIR)/libpcre2-32.a
 #
 
 MACROS = -DLOCALEDIR=\"$(localedir)\" -DPREFIX=L\"$(prefix)\" -DDATADIR=L\"$(datadir)\" -DSYSCONFDIR=L\"$(sysconfdir)\" -DBINDIR=L\"$(bindir)\" -DDOCDIR=L\"$(docdir)\"
-CXXFLAGS = @CXXFLAGS@ -iquote. -iquote./src/ $(MACROS) $(EXTRA_CXXFLAGS)
+CXXFLAGS = @CXXFLAGS@ -iquote. -iquote./src/ $(MACROS) $(PCRE2_CXXFLAGS) $(EXTRA_CXXFLAGS)
 CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 PCRE2 = pcre2-10.20
-LDFLAGS_PCRE2 = -L$(PCRE2_LIBDIR) -lpcre2-32
-LIBS = @LIBS@
-LDFLAGS_FISH = ${LDFLAGS} $(LDFLAGS_PCRE2) @LDFLAGS_FISH@
+LIBS_PCRE2 = -L$(PCRE2_LIBDIR) -lpcre2-32
+LIBS = @LIBS@ $(LIBS_PCRE2)
+LDFLAGS_FISH = ${LDFLAGS} @LDFLAGS_FISH@
 
 #
 # Set to 1 if we have gettext

@@ -10,6 +10,9 @@
 // XXX string_match --regex
 // XXX string_replace
 
+#define PCRE2_CODE_UNIT_WIDTH 32
+#include "pcre2.h"
+
 enum
 {
     BUILTIN_STRING_OK = STATUS_BUILTIN_OK,
@@ -380,6 +383,22 @@ static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string,
     return *pattern == L'\0';
 }
 
+static bool string_match_regex(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
+{
+    int errornumber;
+    PCRE2_SIZE erroroffset;
+
+    pcre2_code *re = pcre2_compile(
+        PCRE2_SPTR32(pattern),               /* the pattern */
+        PCRE2_ZERO_TERMINATED, /* indicates pattern is zero-terminated */
+        0,                     /* default options */
+        &errornumber,          /* for error number */
+        &erroroffset,          /* for error offset */
+        NULL);                 /* use default compile context */
+
+    return false;
+}
+
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"im:nqr";
@@ -458,8 +477,8 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     {
         if (opt_regex)
         {
-            string_fatal_error(L"string match --regex: not yet implemented");
-            return BUILTIN_STRING_ERROR;
+            bool match = string_match_regex(pattern, arg, opt_ignore_case);
+            // XXX
         }
         else
         {
