@@ -10,7 +10,13 @@
 // XXX string_match --regex
 // XXX string_replace
 
+#if WCHAR_MAX == 0xffffffff || WCHAR_MAX == 0x7fffffff
 #define PCRE2_CODE_UNIT_WIDTH 32
+#elif WCHAR_MAX == 0xffff || WCHAR_MAX == 0x7fff
+#define PCRE2_CODE_UNIT_WIDTH 16
+#else
+#error "Need sizeof wchar_t"
+#endif
 #include "pcre2.h"
 
 enum
@@ -383,22 +389,6 @@ static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string,
     return *pattern == L'\0';
 }
 
-static bool string_match_regex(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
-{
-    int errornumber;
-    PCRE2_SIZE erroroffset;
-
-    pcre2_code *re = pcre2_compile(
-        PCRE2_SPTR32(pattern),               /* the pattern */
-        PCRE2_ZERO_TERMINATED, /* indicates pattern is zero-terminated */
-        0,                     /* default options */
-        &errornumber,          /* for error number */
-        &erroroffset,          /* for error offset */
-        NULL);                 /* use default compile context */
-
-    return false;
-}
-
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"im:nqr";
@@ -472,15 +462,70 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     }
 
     int nmatch = 0;
-    const wchar_t *arg;
-    while ((arg = string_get_arg(&i, argv)) != 0)
+
+    if (opt_regex)
     {
-        if (opt_regex)
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+        pcre2_code *regex = pcre2_compile(
+            PCRE2_SPTR(pattern),
+            PCRE2_ZERO_TERMINATED,
+            opt_ignore_case ? PCRE2_CASELESS : 0,
+            &err_code,
+            &err_offset,
+            0);
+        if (regex == 0)
         {
-            bool match = string_match_regex(pattern, arg, opt_ignore_case);
-            // XXX
+            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
+                argv[0], int(err_offset));
+            return BUILTIN_STRING_ERROR;
         }
-        else
+        // XXX move to separate function
+
+        pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(regex, 0);
+
+        const wchar_t *arg;
+        while ((arg = string_get_arg(&i, argv)) != 0)
+        {
+            int arglen = wcslen(arg);
+            int rc = pcre2_match(
+                regex,
+                PCRE2_SPTR(arg),
+                arglen,
+                0 /*offset*/,
+                0 /*options */,
+                match_data,
+                0);
+            if (rc < 0)
+            {
+                // no match
+                // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
+                // XXX deal with errors
+                continue;
+            }
+            if (rc == 0)
+            {
+                // The output vector wasn't big enough. This should not happen,
+                // because we used pcre2_match_data_create_from_pattern()
+                // above.
+            }
+            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+            for (int j = 0; j < rc; j++)
+            {
+                const wchar_t *start = arg + ovector[2*j];
+                int length = ovector[2*j + 1] - ovector[2*j];
+                append_format(stdout_buffer, L"%ls\n", wcstring(start, length).c_str());
+                // XXX show named substrings?
+                // XXX handle repeated matches up to max
+            }
+        }
+        pcre2_match_data_free(match_data);
+        pcre2_code_free(regex);
+    }
+    else
+    {
+        const wchar_t *arg;
+        while ((arg = string_get_arg(&i, argv)) != 0)
         {
             bool match = string_match_wildcard(pattern, arg, opt_ignore_case);
             if (match)
