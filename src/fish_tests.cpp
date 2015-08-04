@@ -4030,7 +4030,28 @@ static void test_string(void)
 
         // XXX string match -r ...
 
-        // XXX string replace
+        { {L"string", L"replace", 0},                               1, L"" },
+        { {L"string", L"replace", L"", 0},                          1, L"" },
+        { {L"string", L"replace", L"", L"", 0},                     1, L"" },
+        { {L"string", L"replace", L"", L"", L"", 0},                1, L"\n" },
+        { {L"string", L"replace", L"", L"", L" ", 0},               1, L" \n" },
+        { {L"string", L"replace", L"a", L"b", L"", 0},              1, L"\n" },
+        { {L"string", L"replace", L"a", L"b", L"a", 0},             0, L"b\n" },
+        { {L"string", L"replace", L"a", L"b", L"xax", 0},           0, L"xbx\n" },
+        { {L"string", L"replace", L"bar", L"x", L"red barn", 0},    0, L"red xn\n" },
+        { {L"string", L"replace", L"x", L"bar", L"red xn", 0},      0, L"red barn\n" },
+        { {L"string", L"replace", L"--", L"x", L"-", L"xyz", 0},    0, L"-yz\n" },
+        { {L"string", L"replace", L"--", L"y", L"-", L"xyz", 0},    0, L"x-z\n" },
+        { {L"string", L"replace", L"--", L"z", L"-", L"xyz", 0},    0, L"xy-\n" },
+        { {L"string", L"replace", L"-i", L"z", L"X", L"_Z_", 0},    0, L"_X_\n" },
+        { {L"string", L"replace", L"-m", L"2", L"a", L"A", L"aaa",  0}, 0, L"AAa\n" },
+        { {L"string", L"replace", L"-m", L"2", L"-i", L"a", L"z", L"AAA", 0}, 0, L"zzA\n" },
+        { {L"string", L"replace", L"-q", L"x", L">x<", L"x", 0},    0, L"" },
+        { {L"string", L"replace", L"x", L"", L"xxx", 0},            0, L"\n" },
+        { {L"string", L"replace", L"***", L"_", L"*****", 0},       0, L"_**\n" },
+        { {L"string", L"replace", L"***", L"***", L"******", 0},    0, L"******\n" },
+
+        // XXX string replace -r ...
 
         { {L"string", L"split", 0},                             1, L"" },
         { {L"string", L"split", L":", 0},                       1, L"" },

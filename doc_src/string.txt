@@ -47,7 +47,7 @@ The following subcommands are available:
 
 - `match` tests each STRING against a pattern and prints matching substrings. All matches are printed unless `-m` or `--max` is given, in which cases at most MAX matches are reported. Matching can be made case-insensitive with `-i` or `--ignore-case`. If `-n` or `--index` is given, the 1-based index of the start of each match is reported instead of the matching substring, or 0 for no match. By default, PATTERN is interpreted as a glob pattern matched against each entire string argument. If `-r` or `--regex` is given, the pattern is interpreted as a regular expression. Exit status: 0 if at least one match was found, or 1 otherwise.
 
-- `replace` is similar to `match` but replaces matching substrings with a replacement string and prints the result. Unless `-r` or `--regex` is specified, PATTERN is treated as a literal substring to be matched. Exit status: 0 if at least one replacement was performed, or 1 otherwise.
+- `replace` is similar to `match` but replaces matching non-overlapping substrings with a replacement string and prints the result. Unless `-r` or `--regex` is specified, PATTERN is treated as a literal substring to be matched. Exit status: 0 if at least one replacement was performed, or 1 otherwise.
 
 
 \subsection string-example Examples

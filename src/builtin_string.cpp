@@ -2,13 +2,16 @@
   Implementation of the string builtin.
 */
 
+// XXX string match --regex
+// XXX string replace --regex
 // XXX consider changes to commands
-//      match -r -n: need index to report start & end indices
-//      split: split on individual characters if SEP is empty?
-// XXX match -n: docs: index is actually a match/nomatch result
-// XXX documentation & help - finish & check formatting
-// XXX string_match --regex
-// XXX string_replace
+//  - match -r -n: need to report start & end indices
+//  - split: split on individual characters if SEP is empty?
+// XXX docs
+//  - review for completeness
+//  - check formatting
+//  - match -n: docs: index is actually a match/nomatch result
+//  - test help
 
 #if WCHAR_MAX == 0xffffffff || WCHAR_MAX == 0x7fffffff
 #define PCRE2_CODE_UNIT_WIDTH 32
@@ -555,8 +558,124 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
-    string_fatal_error(L"string replace: not yet implemented");
-    return BUILTIN_STRING_ERROR;
+    const wchar_t *short_options = L":im:qr";
+    const struct woption long_options[] =
+    {
+        { L"ignore-case", required_argument, 0, 'i'},
+        { L"max", required_argument, 0, 'm'},
+        { L"quiet", no_argument, 0, 'q'},
+        { L"regex", no_argument, 0, 'r'},
+        { 0, 0, 0, 0 }
+    };
+
+    int max = 0;
+    bool ignore_case = false;
+    bool quiet = false;
+    bool regex = false;
+    wgetopter_t w;
+    for (;;)
+    {
+        int c = w.wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1)
+        {
+            break;
+        }
+        switch (c)
+        {
+            case 0:
+                break;
+
+            case 'i':
+                ignore_case = true;
+                break;
+
+            case 'm':
+                max = int(wcstol(w.woptarg, 0, 10));
+                break;
+
+            case 'q':
+                quiet = true;
+                break;
+
+            case 'r':
+                regex = true;
+                break;
+
+            case ':':
+                string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+                return BUILTIN_STRING_ERROR;
+
+            case '?':
+                builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
+                return BUILTIN_STRING_ERROR;
+        }
+    }
+
+    int i = w.woptind;
+    const wchar_t *pattern, *replacement;
+    if ((pattern = string_get_arg_argv(&i, argv)) == 0)
+    {
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+    if ((replacement = string_get_arg_argv(&i, argv)) == 0)
+    {
+        string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    if (!isatty(builtin_stdin) && argc > i)
+    {
+        string_fatal_error(BUILTIN_ERR_TOO_MANY_ARGUMENTS, argv[0]);
+        return BUILTIN_STRING_ERROR;
+    }
+
+    int nreplace = 0;
+    const wchar_t *arg;
+    if (regex)
+    {
+        string_fatal_error(L"string replace --regex: Not yet implemented");
+        return BUILTIN_STRING_ERROR;
+    }
+    else
+    {
+        int patlen = wcslen(pattern);
+        while ((arg = string_get_arg(&i, argv)) != 0)
+        {
+            wcstring replaced;
+            if (patlen == 0)
+            {
+                replaced = arg;
+            }
+            else
+            {
+                const wchar_t *cur = arg;
+                while (*cur != L'\0')
+                {
+                    int cmp = (max > 0 && nreplace >= max) ? 1 :
+                        ignore_case ? wcsncasecmp(cur, pattern, patlen) : wcsncmp(cur, pattern, patlen);
+                    if (cmp == 0)
+                    {
+                        replaced += replacement;
+                        cur += patlen;
+                        nreplace++;
+                    }
+                    else
+                    {
+                        replaced += *cur;
+                        cur++;
+                    }
+                }
+            }
+            if (!quiet)
+            {
+                append_format(stdout_buffer, L"%ls\n", replaced.c_str());
+            }
+        }
+    }
+
+    return (nreplace > 0) ? 0 : 1;
 }
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
