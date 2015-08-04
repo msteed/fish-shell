@@ -4,6 +4,7 @@
 
 // XXX string match --regex
 // XXX string replace --regex
+// XXX include what you use
 // XXX consider changes to commands
 //  - match -r -n: need to report start & end indices
 //  - split: split on individual characters if SEP is empty?
@@ -164,8 +165,8 @@ static int string_escape(parser_t &parser, int argc, wchar_t **argv)
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)
     {
-        wcstring escaped = escape(arg, flags);
-        append_format(stdout_buffer, L"%ls\n", escaped.c_str());
+        stdout_buffer += escape(arg, flags);
+        stdout_buffer += L'\n';
         nesc++;
     }
 
@@ -226,7 +227,8 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
     {
         if (!quiet)
         {
-            append_format(stdout_buffer, L"%ls%ls", arg, sep);
+            stdout_buffer += arg;
+            stdout_buffer += sep;
         }
         njoin++;
     }
@@ -291,7 +293,8 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
         }
         if (!quiet)
         {
-            append_format(stdout_buffer, L"%d\n", int(n));
+            stdout_buffer += to_string(int(n));
+            stdout_buffer += L'\n';
         }
     }
 
@@ -483,13 +486,12 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 argv[0], int(err_offset));
             return BUILTIN_STRING_ERROR;
         }
-        // XXX move to separate function
-
         pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(regex, 0);
 
         const wchar_t *arg;
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
+            // XXX move to separate function
             int arglen = wcslen(arg);
             int rc = pcre2_match(
                 regex,
@@ -517,8 +519,8 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             {
                 const wchar_t *start = arg + ovector[2*j];
                 int length = ovector[2*j + 1] - ovector[2*j];
-                append_format(stdout_buffer, L"%ls\n", wcstring(start, length).c_str());
-                // XXX show named substrings?
+                stdout_buffer += wcstring(start, length);
+                stdout_buffer += L'\n';
                 // XXX handle repeated matches up to max
             }
         }
@@ -539,11 +541,13 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             {
                 if (opt_index)
                 {
-                    append_format(stdout_buffer, L"%lc\n", match ? L'1' : L'0');
+                    stdout_buffer += match ? L'1' : L'0';
+                    stdout_buffer += L'\n';
                 }
                 else if (match)
                 {
-                    append_format(stdout_buffer, L"%ls\n", arg);
+                    stdout_buffer += arg;
+                    stdout_buffer += L'\n';
                 }
             }
             if (max >= 0 && nmatch >= max)
@@ -653,9 +657,8 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
                 const wchar_t *cur = arg;
                 while (*cur != L'\0')
                 {
-                    int cmp = (max > 0 && nreplace >= max) ? 1 :
-                        ignore_case ? wcsncasecmp(cur, pattern, patlen) : wcsncmp(cur, pattern, patlen);
-                    if (cmp == 0)
+                    if ((max == 0 || nreplace < max) &&
+                        (ignore_case ? wcsncasecmp(cur, pattern, patlen) : wcsncmp(cur, pattern, patlen)) == 0)
                     {
                         replaced += replacement;
                         cur += patlen;
@@ -670,7 +673,8 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
             }
             if (!quiet)
             {
-                append_format(stdout_buffer, L"%ls\n", replaced.c_str());
+                stdout_buffer += replaced;
+                stdout_buffer += L'\n';
             }
         }
     }
@@ -775,7 +779,8 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
             {
                 if (!quiet)
                 {
-                    append_format(stdout_buffer, L"%ls\n", (*si).c_str());
+                    stdout_buffer += *si;
+                    stdout_buffer += L'\n';
                 }
                 si++;
             }
@@ -793,7 +798,8 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
                 {
                     if (!quiet)
                     {
-                        append_format(stdout_buffer, L"%ls\n", cur);
+                        stdout_buffer += cur;
+                        stdout_buffer += L'\n';
                     }
                     cur = 0;
                 }
@@ -801,7 +807,8 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
                 {
                     if (!quiet)
                     {
-                        append_format(stdout_buffer, L"%ls\n", wcstring(cur, ptr - cur).c_str());
+                        stdout_buffer += wcstring(cur, ptr - cur);
+                        stdout_buffer += L'\n';
                     }
                     cur = ptr + seplen;
                     nsplit++;
@@ -912,7 +919,8 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
 
         if (!quiet)
         {
-            append_format(stdout_buffer, L"%ls\n", s.substr(pos, count).c_str());
+            stdout_buffer += s.substr(pos, count);
+            stdout_buffer += L'\n';
         }
         nsub++;
     }
@@ -1002,7 +1010,8 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
         }
         if (!quiet)
         {
-            append_format(stdout_buffer, L"%ls\n", wcstring(begin, end - begin).c_str());
+            stdout_buffer += wcstring(begin, end - begin);
+            stdout_buffer += L'\n';
         }
     }
 
