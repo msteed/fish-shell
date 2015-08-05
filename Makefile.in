@@ -53,10 +53,12 @@ localedir = @localedir@
 # pcre2
 #
 
+PCRE2_WIDTH = @WCHAR_T_BITS@
 PCRE2_DIR = pcre2-10.20
 PCRE2_CXXFLAGS = -I$(PCRE2_DIR)/src
 PCRE2_LIBDIR = $(PCRE2_DIR)/.libs
-PCRE2_LIB = $(PCRE2_LIBDIR)/libpcre2-32.a
+PCRE2_LIB = $(PCRE2_LIBDIR)/libpcre2-$(PCRE2_WIDTH).a
+PCRE2_CONFIG = --disable-pcre2-8 --enable-pcre2-$(PCRE2_WIDTH) --disable-shared
 
 #
 # Various flags
@@ -67,7 +69,7 @@ CXXFLAGS = @CXXFLAGS@ -iquote. -iquote./src/ $(MACROS) $(PCRE2_CXXFLAGS) $(EXTRA
 CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 PCRE2 = pcre2-10.20
-LIBS_PCRE2 = -L$(PCRE2_LIBDIR) -lpcre2-32
+LIBS_PCRE2 = -L$(PCRE2_LIBDIR) -lpcre2-$(PCRE2_WIDTH)
 LIBS = @LIBS@ $(LIBS_PCRE2)
 LDFLAGS_FISH = ${LDFLAGS} @LDFLAGS_FISH@
 
@@ -793,7 +795,7 @@ fish: $(FISH_OBJS) obj/fish.o $(PCRE2_LIB)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS_FISH) $(FISH_OBJS) obj/fish.o $(LIBS) -o $@
 
 $(PCRE2_LIB):
-	(cd $(PCRE2_DIR); ./configure --disable-pcre2-8 --enable-pcre2-32 --disable-shared; make)
+	(cd $(PCRE2_DIR); ./configure $(PCRE2_CONFIG); make)
 
 #
 # Build the fish_tests program.

@@ -24,6 +24,7 @@ conf_arg=$@
 AC_SUBST(HAVE_GETTEXT)
 AC_SUBST(HAVE_DOXYGEN)
 AC_SUBST(LDFLAGS_FISH)
+AC_SUBST(WCHAR_T_BITS)
 
 
 #
@@ -784,6 +785,11 @@ if test "$have_working_getopt_long" = yes; then
 else
   AC_MSG_RESULT(no)
 fi
+
+# Get the size in bits of wchar_t
+AC_CHECK_SIZEOF(wchar_t)
+WCHAR_T_BITS=`expr 8 \* $ac_cv_sizeof_wchar_t`
+AC_DEFINE_UNQUOTED([WCHAR_T_BITS], [$WCHAR_T_BITS], [The size of wchar_t in bits.])
 
 # Check for Solaris curses tputs having fixed length parameter list.
 AC_MSG_CHECKING([if we are using non varargs tparm.])

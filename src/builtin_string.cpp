@@ -12,15 +12,9 @@
 //  - review for completeness
 //  - check formatting
 //  - match -n: docs: index is actually a match/nomatch result
-//  - test help
+//  - does help work as expected?
 
-#if WCHAR_MAX == 0xffffffff || WCHAR_MAX == 0x7fffffff
-#define PCRE2_CODE_UNIT_WIDTH 32
-#elif WCHAR_MAX == 0xffff || WCHAR_MAX == 0x7fff
-#define PCRE2_CODE_UNIT_WIDTH 16
-#else
-#error "Need sizeof wchar_t"
-#endif
+#define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #include "pcre2.h"
 
 enum
