@@ -388,6 +388,17 @@ AC_CHECK_HEADER(
   [AC_MSG_ERROR([Could not find the header regex.h, needed to build fish])]
 )
 
+
+#
+# Get the size in bits of wchar_t, needed for configuring the pcre2 build
+# and for code that #includes pcre2 headers
+#
+
+AC_CHECK_SIZEOF(wchar_t)
+WCHAR_T_BITS=`expr 8 \* $ac_cv_sizeof_wchar_t`
+AC_DEFINE_UNQUOTED([WCHAR_T_BITS], [$WCHAR_T_BITS], [The size of wchar_t in bits.])
+
+
 #
 # On some platforms (Solaris 10) adding -std=c99 in turn requires that
 # _POSIX_C_SOURCE be defined to 200112L otherwise several
@@ -786,10 +797,6 @@ else
   AC_MSG_RESULT(no)
 fi
 
-# Get the size in bits of wchar_t
-AC_CHECK_SIZEOF(wchar_t)
-WCHAR_T_BITS=`expr 8 \* $ac_cv_sizeof_wchar_t`
-AC_DEFINE_UNQUOTED([WCHAR_T_BITS], [$WCHAR_T_BITS], [The size of wchar_t in bits.])
 
 # Check for Solaris curses tputs having fixed length parameter list.
 AC_MSG_CHECKING([if we are using non varargs tparm.])

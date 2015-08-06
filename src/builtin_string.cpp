@@ -13,6 +13,8 @@
 //  - check formatting
 //  - match -n: docs: index is actually a match/nomatch result
 //  - does help work as expected?
+// XXX misc
+//  - configure.ac looks for regex.h but this header is not included anywhere
 
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #include "pcre2.h"
