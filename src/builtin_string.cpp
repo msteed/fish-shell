@@ -305,7 +305,7 @@ static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string,
                 break;
 
             case L'*':
-                // skip repeated *
+                // skip redundant *
                 while (*pattern == L'*')
                 {
                     pattern++;
@@ -402,11 +402,11 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         { 0, 0, 0, 0 }
     };
 
-    int max = -1;
-    bool opt_ignore_case = false;
-    bool opt_index = false;
-    bool opt_quiet = false;
-    bool opt_regex = false;
+    int max = 0;
+    bool ignore_case = false;
+    bool index = false;
+    bool quiet = false;
+    bool regex = false;
     wgetopter_t w;
     for (;;)
     {
@@ -422,7 +422,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'i':
-                opt_ignore_case = true;
+                ignore_case = true;
                 break;
 
             case 'm':
@@ -430,15 +430,15 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'n':
-                opt_index = true;
+                index = true;
                 break;
 
             case 'q':
-                opt_quiet = true;
+                quiet = true;
                 break;
 
             case 'r':
-                opt_regex = true;
+                regex = true;
                 break;
 
             case '?':
@@ -463,90 +463,100 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
 
     int nmatch = 0;
 
-    if (opt_regex)
+    if (regex)
     {
-        int err_code = 0;
-        PCRE2_SIZE err_offset = 0;
-        pcre2_code *regex = pcre2_compile(
+        int err = 0;
+        PCRE2_SIZE eoff = 0;
+        pcre2_code *re = pcre2_compile(
             PCRE2_SPTR(pattern),
             PCRE2_ZERO_TERMINATED,
-            opt_ignore_case ? PCRE2_CASELESS : 0,
-            &err_code,
-            &err_offset,
+            ignore_case ? PCRE2_CASELESS : 0,
+            &err,
+            &eoff,
             0);
-        if (regex == 0)
+        if (re == 0)
         {
             string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
-                argv[0], int(err_offset));
+                argv[0], int(eoff));
             return BUILTIN_STRING_ERROR;
         }
-        pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(regex, 0);
+        pcre2_match_data *match = pcre2_match_data_create_from_pattern(re, 0);
+        // XXX ^ returns 0 if memory allocation fails
 
         const wchar_t *arg;
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
-            // XXX move to separate function
-            int arglen = wcslen(arg);
-            int rc = pcre2_match(
-                regex,
-                PCRE2_SPTR(arg),
-                arglen,
-                0 /*offset*/,
-                0 /*options */,
-                match_data,
-                0);
+            PCRE2_SIZE arglen = wcslen(arg);
+            int rc = pcre2_match(re, PCRE2_SPTR(arg), arglen, 0, 0, match, 0);
+            if (rc == PCRE2_ERROR_NOMATCH)
+            {
+                continue;
+            }
             if (rc < 0)
             {
-                // no match
                 // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
-                // XXX deal with errors
-                continue;
+                string_fatal_error(_(L"%ls: Regular expression match error %d"), argv[0], rc);
+                return BUILTIN_STRING_ERROR;
             }
             if (rc == 0)
             {
-                // The output vector wasn't big enough. This should not happen,
-                // because we used pcre2_match_data_create_from_pattern()
-                // above.
+                // The output vector wasn't big enough. Should not happen.
+                string_fatal_error(_(L"%ls: Regular expression internal error"), argv[0]);
+                return BUILTIN_STRING_ERROR;
             }
-            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
             for (int j = 0; j < rc; j++)
             {
-                const wchar_t *start = arg + ovector[2*j];
-                int length = ovector[2*j + 1] - ovector[2*j];
-                stdout_buffer += wcstring(start, length);
+                PCRE2_SIZE begin = ovector[2*j];
+                PCRE2_SIZE end = ovector[2*j + 1];
+                // XXX index
+                // XXX quiet
+                stdout_buffer += wcstring(&arg[begin], end - begin);
                 stdout_buffer += L'\n';
-                // XXX handle repeated matches up to max
             }
+            nmatch++;
+
+            // Report any additional matches
+#if 0
+            PCRE2_SIZE offset = 0;
+            for (;;)
+            {
+                uint32_t options = 0;
+                if (begin == end)
+                {
+                    options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+                }
+            }
+#endif
         }
-        pcre2_match_data_free(match_data);
-        pcre2_code_free(regex);
+        pcre2_match_data_free(match);
+        pcre2_code_free(re);
     }
     else
     {
         const wchar_t *arg;
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
-            bool match = string_match_wildcard(pattern, arg, opt_ignore_case);
-            if (match)
+            if (max == 0 || nmatch < max)
             {
-                nmatch++;
-            }
-            if (!opt_quiet)
-            {
-                if (opt_index)
+                bool match = string_match_wildcard(pattern, arg, ignore_case);
+                if (match)
                 {
-                    stdout_buffer += match ? L'1' : L'0';
-                    stdout_buffer += L'\n';
+                    nmatch++;
                 }
-                else if (match)
+                if (!quiet)
                 {
-                    stdout_buffer += arg;
-                    stdout_buffer += L'\n';
+                    if (index)
+                    {
+                        stdout_buffer += match ? L'1' : L'0';
+                        stdout_buffer += L'\n';
+                    }
+                    else if (match)
+                    {
+                        stdout_buffer += arg;
+                        stdout_buffer += L'\n';
+                    }
                 }
-            }
-            if (max >= 0 && nmatch >= max)
-            {
-                break;
             }
         }
     }
