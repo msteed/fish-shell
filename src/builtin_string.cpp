@@ -391,6 +391,41 @@ static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string,
     return *pattern == L'\0';
 }
 
+static int string_report_re_match(
+        const wchar_t *argv0,
+        const wchar_t *arg,
+        pcre2_match_data *match,
+        int pcre2_rc)
+{
+    if (pcre2_rc == PCRE2_ERROR_NOMATCH)
+    {
+        return 0;
+    }
+    if (pcre2_rc < 0)
+    {
+        // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
+        string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, pcre2_rc);
+        return -1;
+    }
+    if (pcre2_rc == 0)
+    {
+        // The output vector wasn't big enough. Should not happen.
+        string_fatal_error(_(L"%ls: Regular expression internal error"), argv0);
+        return -1;
+    }
+    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+    for (int j = 0; j < pcre2_rc; j++)
+    {
+        PCRE2_SIZE begin = ovector[2*j];
+        PCRE2_SIZE end = ovector[2*j + 1];
+        // XXX index
+        // XXX quiet
+        stdout_buffer += wcstring(&arg[begin], end - begin);
+        stdout_buffer += L'\n';
+    }
+    return 1;
+}
+
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"im:nqr";
@@ -483,53 +518,83 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             return BUILTIN_STRING_ERROR;
         }
         pcre2_match_data *match = pcre2_match_data_create_from_pattern(re, 0);
-        // XXX ^ returns 0 if memory allocation fails
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+        if (match == 0)
+        {
+            DIE_MEM();
+        }
 
         const wchar_t *arg;
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
             PCRE2_SIZE arglen = wcslen(arg);
             int rc = pcre2_match(re, PCRE2_SPTR(arg), arglen, 0, 0, match, 0);
-            if (rc == PCRE2_ERROR_NOMATCH)
-            {
-                continue;
-            }
+            rc = string_report_re_match(argv[0], arg, match, rc);
             if (rc < 0)
             {
-                // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
-                string_fatal_error(_(L"%ls: Regular expression match error %d"), argv[0], rc);
+                // XXX free
                 return BUILTIN_STRING_ERROR;
             }
             if (rc == 0)
             {
-                // The output vector wasn't big enough. Should not happen.
-                string_fatal_error(_(L"%ls: Regular expression internal error"), argv[0]);
-                return BUILTIN_STRING_ERROR;
-            }
-            PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-            for (int j = 0; j < rc; j++)
-            {
-                PCRE2_SIZE begin = ovector[2*j];
-                PCRE2_SIZE end = ovector[2*j + 1];
-                // XXX index
-                // XXX quiet
-                stdout_buffer += wcstring(&arg[begin], end - begin);
-                stdout_buffer += L'\n';
+                continue;
             }
             nmatch++;
 
             // Report any additional matches
-#if 0
-            PCRE2_SIZE offset = 0;
             for (;;)
             {
-                uint32_t options = 0;
-                if (begin == end)
+                uint32_t options = 0; // Normally no options
+                PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
+
+                // If the previous match was for an empty string, we are
+                // finished if we are at the end of the subject. Otherwise,
+                // arrange to run another match at the same point to see if a
+                // non-empty match can be found.
+
+                if (ovector[0] == ovector[1])
                 {
+                    if (ovector[0] == arglen)
+                    {
+                        break;
+                    }
                     options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
                 }
+
+                // Run the next matching operation
+
+                rc = pcre2_match(re, PCRE2_SPTR(arg), arglen, offset, options, match, 0);
+                rc = string_report_re_match(argv[0], arg, match, rc);
+
+                // This time, a result of NOMATCH isn't an error. If the value
+                // in "options" is zero, it just means we have found all
+                // possible matches, so the loop ends. Otherwise, it means we
+                // have failed to find a non-empty-string match at a point
+                // where there was a previous empty-string match. In this case,
+                // we do what Perl does: advance the matching position by one
+                // character, and continue. We do this by setting the "end of
+                // previous match" offset, because that is picked up at the top
+                // of the loop as the point at which to start again.
+
+                if (rc < 0)
+                {
+                    // XXX free
+                    return BUILTIN_STRING_ERROR;
+                }
+                if (rc == 0)
+                {
+                    if (options == 0)
+                    {
+                        // All matches found
+                        break;
+                    }
+                    ovector[1] = offset + 1; // Advance one code unit
+                    continue;
+                }
+
+                nmatch++;
             }
-#endif
+
         }
         pcre2_match_data_free(match);
         pcre2_code_free(re);
