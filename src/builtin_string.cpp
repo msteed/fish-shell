@@ -2,7 +2,6 @@
   Implementation of the string builtin.
 */
 
-// XXX string match --regex
 // XXX string replace --regex
 // XXX include what you use
 // XXX consider changes to commands
@@ -538,18 +537,11 @@ public:
                 {
                     if (opts.index)
                     {
-                        // XXX should change output of --index to just start index, or start + end
-                        //     to handle the case where end < begin
-                        stdout_buffer += to_string(begin);
-                        stdout_buffer += L' ';
-                        stdout_buffer += to_string(end);
+                        stdout_buffer += to_string(begin + 1);
                     }
-                    else
+                    else if (end > begin) // may have end < begin if \K is used
                     {
-                        if (end >= begin) // may be false if \K is used
-                        {
-                            stdout_buffer += wcstring(&arg[begin], end - begin);
-                        }
+                        stdout_buffer += wcstring(&arg[begin], end - begin);
                     }
                     stdout_buffer += L'\n';
                 }
@@ -560,6 +552,8 @@ public:
 
     bool report_matches(const wchar_t *arg)
     {
+        // A return value of true means all is well (even if no matches were
+        // found), false indicates an unrecoverable error.
         if (regex == 0)
         {
             // pcre2_compile() failed
@@ -574,18 +568,29 @@ public:
         // See pcre2demo.c for an explanation of this logic
         PCRE2_SIZE arglen = wcslen(arg);
         int rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, 0, 0, match, 0));
-        if (rc <= 0)
+        if (rc < 0)
         {
+            // pcre2 match error
             return false;
+        }
+        if (rc == 0)
+        {
+            // no match
+            return true;
         }
         nmatch++;
 
         // Report any additional matches
         PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-        for (;;)
+        while (opts.max == 0 || nmatch < opts.max)
         {
             uint32_t options = 0;
             PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
+            PCRE2_SIZE old_offset = pcre2_get_startchar(match);
+            if (offset <= old_offset)
+            {
+                offset = old_offset + 1;
+            }
 
             if (ovector[0] == ovector[1])
             {
