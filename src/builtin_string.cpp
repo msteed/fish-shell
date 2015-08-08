@@ -6,12 +6,11 @@
 // XXX string replace --regex
 // XXX include what you use
 // XXX consider changes to commands
-//  - match -r -n: need to report start & end indices
+//  - match -n: need to report start & length
 //  - split: split on individual characters if SEP is empty?
 // XXX docs
 //  - review for completeness
 //  - check formatting
-//  - match -n: docs: index is actually a match/nomatch result
 //  - does help work as expected?
 // XXX misc
 //  - configure.ac looks for regex.h but this header is not included anywhere
@@ -297,133 +296,306 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
     return (nnonempty > 0) ? 0 : 1;
 }
 
-static bool string_match_wildcard(const wchar_t *pattern, const wchar_t *string, bool ignore_case)
+struct match_options_t
 {
-    for (; *string != L'\0'; string++, pattern++)
+    bool regex;
+    bool ignore_case;
+    bool index;
+    bool quiet;
+    int max;
+
+    match_options_t(): regex(false), ignore_case(false), index(false), quiet(false), max(0) { }
+};
+
+class string_matcher_t
+{
+protected:
+    match_options_t opts;
+    const wchar_t *argv0;
+    int nmatch;
+
+public:
+    string_matcher_t(const wchar_t *argv0_, const match_options_t &opts_)
+        : opts(opts_), argv0(argv0_), nmatch(0)
+    { }
+
+    virtual ~string_matcher_t() {}
+    virtual bool report_matches(const wchar_t *arg) = 0;
+    int match_count() { return nmatch; }
+};
+
+class wildcard_matcher_t: public string_matcher_t
+{
+    const wchar_t *pattern;
+
+public:
+    wildcard_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern_)
+        : string_matcher_t(argv0_, opts_),
+          pattern(pattern_)
+    { }
+
+    bool arg_matches(const wchar_t *pat, const wchar_t *arg)
     {
-        switch (*pattern)
+        for (; *arg != L'\0'; arg++, pat++)
         {
-            case L'?':
-                break;
+            switch (*pat)
+            {
+                case L'?':
+                    break;
 
-            case L'*':
-                // skip redundant *
-                while (*pattern == L'*')
-                {
-                    pattern++;
-                }
+                case L'*':
+                    // skip redundant *
+                    while (*pat == L'*')
+                    {
+                        pat++;
+                    }
 
-                // * at end matches whatever follows
-                if (*pattern == L'\0')
-                {
-                    return true;
-                }
-
-                while (*string != L'\0')
-                {
-                    if (string_match_wildcard(pattern, string++, ignore_case))
+                    // * at end matches whatever follows
+                    if (*pat == L'\0')
                     {
                         return true;
                     }
-                }
-                return false;
 
-            case L'[':
-            {
-                bool negate = false;
-                if (*++pattern == L'^')
-                {
-                    negate = true;
-                    pattern++;
-                }
-
-                bool match = false;
-                wchar_t strch = ignore_case ? towlower(*string) : *string;
-                wchar_t patch, patch2;
-                while ((patch = *pattern++) != L']')
-                {
-                    if (patch == L'\0')
+                    while (*arg != L'\0')
                     {
-                        return false; // no closing ]
+                        if (arg_matches(pat, arg++))
+                        {
+                            return true;
+                        }
                     }
-                    if (*pattern == L'-' && (patch2 = *(pattern + 1)) != L'\0' && patch2 != L']')
+                    return false;
+
+                case L'[':
+                {
+                    bool negate = false;
+                    if (*++pat == L'^')
                     {
-                        if (ignore_case ? towlower(patch) <= strch && strch <= towlower(patch2)
-                                        : patch <= strch && strch <= patch2)
+                        negate = true;
+                        pat++;
+                    }
+
+                    bool match = false;
+                    wchar_t argch = opts.ignore_case ? towlower(*arg) : *arg;
+                    wchar_t patch, patch2;
+                    while ((patch = *pat++) != L']')
+                    {
+                        if (patch == L'\0')
+                        {
+                            return false; // no closing ]
+                        }
+                        if (*pat == L'-' && (patch2 = *(pat + 1)) != L'\0' && patch2 != L']')
+                        {
+                            if (opts.ignore_case ? towlower(patch) <= argch && argch <= towlower(patch2)
+                                                 : patch <= argch && argch <= patch2)
+                            {
+                                match = true;
+                            }
+                            pat += 2;
+                        }
+                        else if (patch == argch)
                         {
                             match = true;
                         }
-                        pattern += 2;
                     }
-                    else if (patch == strch)
+                    if (match == negate)
                     {
-                        match = true;
+                        return false;
                     }
+                    pat--;
+                    break;
                 }
-                if (match == negate)
-                {
-                    return false;
-                }
-                pattern--;
-                break;
+
+                case L'\\':
+                    if (*(pat + 1) != L'\0')
+                    {
+                        pat++;
+                    }
+                    // fall through
+
+                default:
+                    if (opts.ignore_case ? towlower(*arg) != towlower(*pat) : *arg != *pat)
+                    {
+                        return false;
+                    }
+                    break;
             }
+        }
+        // arg is exhausted - it's a match only if pattern is as well
+        while (*pat == L'*')
+        {
+            pat++;
+        }
+        return *pat == L'\0';
+    }
 
-            case L'\\':
-                if (*(pattern + 1) != L'\0')
+    bool report_matches(const wchar_t *arg)
+    {
+        if (opts.max == 0 || nmatch < opts.max)
+        {
+            bool match = arg_matches(pattern, arg);
+            if (match)
+            {
+                nmatch++;
+            }
+            if (!opts.quiet)
+            {
+                if (opts.index)
                 {
-                    pattern++;
+                    stdout_buffer += match ? L'1' : L'0';
+                    stdout_buffer += L'\n';
                 }
-                // fall through
+                else if (match)
+                {
+                    stdout_buffer += arg;
+                    stdout_buffer += L'\n';
+                }
+            }
+        }
+        return true;
+    }
+};
 
-            default:
-                if (ignore_case ? towlower(*string) != towlower(*pattern) : *string != *pattern)
-                {
-                    return false;
-                }
-                break;
+class pcre2_matcher_t: public string_matcher_t
+{
+    pcre2_code *regex;
+    pcre2_match_data *match;
+
+public:
+    pcre2_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern)
+        : string_matcher_t(argv0_, opts_),
+          regex(0), match(0)
+    {
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+
+        regex = pcre2_compile(
+            PCRE2_SPTR(pattern),
+            PCRE2_ZERO_TERMINATED,
+            opts.ignore_case ? PCRE2_CASELESS : 0,
+            &err_code,
+            &err_offset,
+            0);
+        if (regex == 0)
+        {
+            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
+                argv0, int(err_offset));
+            return;
+        }
+
+        match = pcre2_match_data_create_from_pattern(regex, 0);
+        if (match == 0)
+        {
+            DIE_MEM();
         }
     }
-    // string is exhausted - it's a match only if pattern is as well
-    while (*pattern == L'*')
-    {
-        pattern++;
-    }
-    return *pattern == L'\0';
-}
 
-static int string_report_re_match(
-        const wchar_t *argv0,
-        const wchar_t *arg,
-        pcre2_match_data *match,
-        int pcre2_rc)
+    ~pcre2_matcher_t()
+    {
+        if (match != 0)
+        {
+            pcre2_match_data_free(match);
+        }
+        if (regex != 0)
+        {
+            pcre2_code_free(regex);
+        }
+    }
+
+    int report_match(const wchar_t *arg, int pcre2_rc)
+    {
+        if (pcre2_rc == PCRE2_ERROR_NOMATCH)
+        {
+            return 0;
+        }
+        if (pcre2_rc < 0)
+        {
+            // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
+            string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, pcre2_rc);
+            return -1;
+        }
+        if (pcre2_rc == 0)
+        {
+            // The output vector wasn't big enough. Should not happen.
+            string_fatal_error(_(L"%ls: Regular expression internal error"), argv0);
+            return -1;
+        }
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+        for (int j = 0; j < pcre2_rc; j++)
+        {
+            PCRE2_SIZE begin = ovector[2*j];
+            PCRE2_SIZE end = ovector[2*j + 1];
+            // XXX index
+            // XXX quiet
+            stdout_buffer += wcstring(&arg[begin], end - begin);
+            stdout_buffer += L'\n';
+        }
+        return 1;
+    }
+
+    bool report_matches(const wchar_t *arg)
+    {
+        if (regex == 0)
+        {
+            // pcre2_compile() failed
+            return false;
+        }
+
+        // See pcre2demo.c for an explanation of this logic
+        PCRE2_SIZE arglen = wcslen(arg);
+        int rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, 0, 0, match, 0));
+        if (rc <= 0)
+        {
+            return false;
+        }
+        nmatch++;
+
+        // Report any additional matches
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+        for (;;)
+        {
+            uint32_t options = 0;
+            PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
+
+            if (ovector[0] == ovector[1])
+            {
+                if (ovector[0] == arglen)
+                {
+                    break;
+                }
+                options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+            }
+
+            rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, offset, options, match, 0));
+            if (rc < 0)
+            {
+                return false;
+            }
+            if (rc == 0)
+            {
+                if (options == 0)
+                {
+                    // All matches found
+                    break;
+                }
+                ovector[1] = offset + 1;
+                continue;
+            }
+            nmatch++;
+        }
+        return true;
+    }
+};
+
+static string_matcher_t *make_matcher(const wchar_t *argv0, const match_options_t &opts, const wchar_t *pattern)
 {
-    if (pcre2_rc == PCRE2_ERROR_NOMATCH)
+    if (opts.regex)
     {
-        return 0;
+        return new pcre2_matcher_t(argv0, opts, pattern);
     }
-    if (pcre2_rc < 0)
+    else
     {
-        // see http://www.pcre.org/current/doc/html/pcre2api.html#SEC30
-        string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, pcre2_rc);
-        return -1;
+        return new wildcard_matcher_t(argv0, opts, pattern);
     }
-    if (pcre2_rc == 0)
-    {
-        // The output vector wasn't big enough. Should not happen.
-        string_fatal_error(_(L"%ls: Regular expression internal error"), argv0);
-        return -1;
-    }
-    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-    for (int j = 0; j < pcre2_rc; j++)
-    {
-        PCRE2_SIZE begin = ovector[2*j];
-        PCRE2_SIZE end = ovector[2*j + 1];
-        // XXX index
-        // XXX quiet
-        stdout_buffer += wcstring(&arg[begin], end - begin);
-        stdout_buffer += L'\n';
-    }
-    return 1;
 }
 
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
@@ -439,11 +611,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         { 0, 0, 0, 0 }
     };
 
-    int max = 0;
-    bool ignore_case = false;
-    bool index = false;
-    bool quiet = false;
-    bool regex = false;
+    match_options_t opts;
     wgetopter_t w;
     for (;;)
     {
@@ -459,23 +627,23 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'i':
-                ignore_case = true;
+                opts.ignore_case = true;
                 break;
 
             case 'm':
-                max = int(wcstol(w.woptarg, 0, 10));
+                opts.max = int(wcstol(w.woptarg, 0, 10));
                 break;
 
             case 'n':
-                index = true;
+                opts.index = true;
                 break;
 
             case 'q':
-                quiet = true;
+                opts.quiet = true;
                 break;
 
             case 'r':
-                regex = true;
+                opts.regex = true;
                 break;
 
             case '?':
@@ -498,137 +666,21 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    int nmatch = 0;
+    string_matcher_t *matcher = make_matcher(argv[0], opts, pattern);
 
-    if (regex)
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
     {
-        int err = 0;
-        PCRE2_SIZE eoff = 0;
-        pcre2_code *re = pcre2_compile(
-            PCRE2_SPTR(pattern),
-            PCRE2_ZERO_TERMINATED,
-            ignore_case ? PCRE2_CASELESS : 0,
-            &err,
-            &eoff,
-            0);
-        if (re == 0)
+        if (!matcher->report_matches(arg))
         {
-            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
-                argv[0], int(eoff));
+            delete matcher;
             return BUILTIN_STRING_ERROR;
         }
-        pcre2_match_data *match = pcre2_match_data_create_from_pattern(re, 0);
-        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-        if (match == 0)
-        {
-            DIE_MEM();
-        }
-
-        const wchar_t *arg;
-        while ((arg = string_get_arg(&i, argv)) != 0)
-        {
-            PCRE2_SIZE arglen = wcslen(arg);
-            int rc = pcre2_match(re, PCRE2_SPTR(arg), arglen, 0, 0, match, 0);
-            rc = string_report_re_match(argv[0], arg, match, rc);
-            if (rc < 0)
-            {
-                // XXX free
-                return BUILTIN_STRING_ERROR;
-            }
-            if (rc == 0)
-            {
-                continue;
-            }
-            nmatch++;
-
-            // Report any additional matches
-            for (;;)
-            {
-                uint32_t options = 0; // Normally no options
-                PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
-
-                // If the previous match was for an empty string, we are
-                // finished if we are at the end of the subject. Otherwise,
-                // arrange to run another match at the same point to see if a
-                // non-empty match can be found.
-
-                if (ovector[0] == ovector[1])
-                {
-                    if (ovector[0] == arglen)
-                    {
-                        break;
-                    }
-                    options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
-                }
-
-                // Run the next matching operation
-
-                rc = pcre2_match(re, PCRE2_SPTR(arg), arglen, offset, options, match, 0);
-                rc = string_report_re_match(argv[0], arg, match, rc);
-
-                // This time, a result of NOMATCH isn't an error. If the value
-                // in "options" is zero, it just means we have found all
-                // possible matches, so the loop ends. Otherwise, it means we
-                // have failed to find a non-empty-string match at a point
-                // where there was a previous empty-string match. In this case,
-                // we do what Perl does: advance the matching position by one
-                // character, and continue. We do this by setting the "end of
-                // previous match" offset, because that is picked up at the top
-                // of the loop as the point at which to start again.
-
-                if (rc < 0)
-                {
-                    // XXX free
-                    return BUILTIN_STRING_ERROR;
-                }
-                if (rc == 0)
-                {
-                    if (options == 0)
-                    {
-                        // All matches found
-                        break;
-                    }
-                    ovector[1] = offset + 1; // Advance one code unit
-                    continue;
-                }
-
-                nmatch++;
-            }
-
-        }
-        pcre2_match_data_free(match);
-        pcre2_code_free(re);
-    }
-    else
-    {
-        const wchar_t *arg;
-        while ((arg = string_get_arg(&i, argv)) != 0)
-        {
-            if (max == 0 || nmatch < max)
-            {
-                bool match = string_match_wildcard(pattern, arg, ignore_case);
-                if (match)
-                {
-                    nmatch++;
-                }
-                if (!quiet)
-                {
-                    if (index)
-                    {
-                        stdout_buffer += match ? L'1' : L'0';
-                        stdout_buffer += L'\n';
-                    }
-                    else if (match)
-                    {
-                        stdout_buffer += arg;
-                        stdout_buffer += L'\n';
-                    }
-                }
-            }
-        }
     }
 
-    return (nmatch > 0) ? 0 : 1;
+    int rc = matcher->match_count() > 0 ? 0 : 1;
+    delete matcher;
+    return rc;
 }
 
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
