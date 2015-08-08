@@ -16,6 +16,9 @@
 //  - configure.ac looks for regex.h but this header is not included anywhere
 
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
+#ifdef _WIN32
+#define PCRE2_STATIC
+#endif
 #include "pcre2.h"
 
 enum
@@ -298,13 +301,12 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
 
 struct match_options_t
 {
-    bool regex;
     bool ignore_case;
     bool index;
     bool quiet;
     int max;
 
-    match_options_t(): regex(false), ignore_case(false), index(false), quiet(false), max(0) { }
+    match_options_t(): ignore_case(false), index(false), quiet(false), max(0) { }
 };
 
 class string_matcher_t
@@ -468,10 +470,16 @@ public:
         int err_code = 0;
         PCRE2_SIZE err_offset = 0;
 
+        // Disable some sequences that can lead to security problems
+        uint32_t pcre2_options = PCRE2_NEVER_UTF;
+#if PCRE2_CODE_UNIT_WIDTH < 32
+        options |= PCRE2_NEVER_BACKSLASH_C;
+#endif
+
         regex = pcre2_compile(
             PCRE2_SPTR(pattern),
             PCRE2_ZERO_TERMINATED,
-            opts.ignore_case ? PCRE2_CASELESS : 0,
+            pcre2_options | (opts.ignore_case ? PCRE2_CASELESS : 0),
             &err_code,
             &err_offset,
             0);
@@ -524,10 +532,28 @@ public:
         {
             PCRE2_SIZE begin = ovector[2*j];
             PCRE2_SIZE end = ovector[2*j + 1];
-            // XXX index
-            // XXX quiet
-            stdout_buffer += wcstring(&arg[begin], end - begin);
-            stdout_buffer += L'\n';
+            if (!opts.quiet)
+            {
+                if (begin != PCRE2_UNSET && end != PCRE2_UNSET)
+                {
+                    if (opts.index)
+                    {
+                        // XXX should change output of --index to just start index, or start + end
+                        //     to handle the case where end < begin
+                        stdout_buffer += to_string(begin);
+                        stdout_buffer += L' ';
+                        stdout_buffer += to_string(end);
+                    }
+                    else
+                    {
+                        if (end >= begin) // may be false if \K is used
+                        {
+                            stdout_buffer += wcstring(&arg[begin], end - begin);
+                        }
+                    }
+                    stdout_buffer += L'\n';
+                }
+            }
         }
         return 1;
     }
@@ -538,6 +564,11 @@ public:
         {
             // pcre2_compile() failed
             return false;
+        }
+
+        if (opts.max > 0 && nmatch >= opts.max)
+        {
+            return true;
         }
 
         // See pcre2demo.c for an explanation of this logic
@@ -586,18 +617,6 @@ public:
     }
 };
 
-static string_matcher_t *make_matcher(const wchar_t *argv0, const match_options_t &opts, const wchar_t *pattern)
-{
-    if (opts.regex)
-    {
-        return new pcre2_matcher_t(argv0, opts, pattern);
-    }
-    else
-    {
-        return new wildcard_matcher_t(argv0, opts, pattern);
-    }
-}
-
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
     const wchar_t *short_options = L"im:nqr";
@@ -612,6 +631,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     };
 
     match_options_t opts;
+    bool regex = false;
     wgetopter_t w;
     for (;;)
     {
@@ -643,7 +663,7 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'r':
-                opts.regex = true;
+                regex = true;
                 break;
 
             case '?':
@@ -666,7 +686,15 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    string_matcher_t *matcher = make_matcher(argv[0], opts, pattern);
+    string_matcher_t *matcher;
+    if (regex)
+    {
+        matcher = new pcre2_matcher_t(argv[0], opts, pattern);
+    }
+    else
+    {
+        matcher = new wildcard_matcher_t(argv[0], opts, pattern);
+    }
 
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)

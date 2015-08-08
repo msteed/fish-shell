@@ -391,7 +391,7 @@ AC_CHECK_HEADER(
 
 #
 # Get the size in bits of wchar_t, needed for configuring the pcre2 build
-# and for code that #includes pcre2 headers
+# and for code that #includes pcre2.h
 #
 
 AC_CHECK_SIZEOF(wchar_t)

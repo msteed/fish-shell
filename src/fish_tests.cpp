@@ -4029,6 +4029,7 @@ static void test_string(void)
         { {L"string", L"match", L"-q", L"a*", L"b", L"a", 0},   0, L"" },
 
         // XXX string match -r ...
+        // XXX test matching "abc" against the pattern (a|(z))(bc) -> some ovector pairs are unset
 
         { {L"string", L"replace", 0},                               1, L"" },
         { {L"string", L"replace", L"", 0},                          1, L"" },
