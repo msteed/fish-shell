@@ -2,17 +2,14 @@
   Implementation of the string builtin.
 */
 
+// XXX implement string split --left '' ...
+// XXX tests for string split '' ...
 // XXX string replace --regex
 // XXX include what you use
-// XXX consider changes to commands
-//  - match -n: need to report start & length
-//  - split: split on individual characters if SEP is empty?
 // XXX docs
-//  - review for completeness
+//  - review for completeness & correctness
 //  - check formatting
 //  - does help work as expected?
-// XXX misc
-//  - configure.ac looks for regex.h but this header is not included anywhere
 
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #ifdef _WIN32
@@ -902,6 +899,7 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
+    bool split_chars = (*sep == L'\0');
     int seplen = wcslen(sep);
     int nsplit = 0;
     const wchar_t *arg;
@@ -911,25 +909,24 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
         {
             std::list<wcstring> splits;
             const wchar_t *end = arg + wcslen(arg);
-            const wchar_t *cur = end - seplen;
-            if (seplen > 0)
+            const wchar_t *cur = end - (split_chars ? 1 : seplen);
+            while (((split_chars && cur > arg) || (!split_chars && cur >= arg)) &&
+                   (max == 0 || nsplit < max))
             {
-                while (cur >= arg && (max == 0 || nsplit < max))
+                if (split_chars || wcsncmp(cur, sep, seplen) == 0)
                 {
-                    if (wcsncmp(cur, sep, seplen) == 0)
-                    {
-                        splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
-                        end = cur;
-                        nsplit++;
-                        cur -= seplen;
-                    }
-                    else
-                    {
-                        cur--;
-                    }
+                    splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
+                    end = cur;
+                    nsplit++;
+                    cur -= split_chars ? 1 : seplen;
                 }
-                splits.push_front(wcstring(arg, end - arg).c_str());
+                else
+                {
+                    cur--;
+                }
             }
+            splits.push_front(wcstring(arg, end - arg).c_str());
+
             std::list<wcstring>::const_iterator si = splits.begin();
             while (si != splits.end())
             {
@@ -1193,7 +1190,7 @@ string_subcommands[] =
 };
 
 /**
-   The string builtin. Used for manipulating strings.
+   The string builtin, for manipulating strings.
 */
 /*static*/ int builtin_string(parser_t &parser, wchar_t **argv)
 {

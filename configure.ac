@@ -376,18 +376,6 @@ if test x$local_gettext != xno; then
   AC_CHECK_HEADERS([libintl.h])
 fi
 
-AC_CHECK_HEADER(
-  [regex.h],
-  [
-    AC_DEFINE(
-      [HAVE_REGEX_H],
-      [1],
-      [Define to 1 if you have the <regex.h> header file.]
-    )
-  ],
-  [AC_MSG_ERROR([Could not find the header regex.h, needed to build fish])]
-)
-
 
 #
 # Get the size in bits of wchar_t, needed for configuring the pcre2 build
