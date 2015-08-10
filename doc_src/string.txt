@@ -81,7 +81,7 @@ string split . example.com
 # example
 # com
 
-string split -r -n1 / /usr/local/bin/fish
+string split -r -m1 / /usr/local/bin/fish
 # Output:
 # /usr/local/bin
 # fish
@@ -94,7 +94,7 @@ seq 3 | string join ...
 \endfish
 
 \fish
-string trim \tabc\ d\n
+string trim ' abc d '
 # Output:
 # abc d
 
@@ -105,7 +105,7 @@ string trim -r -c yz xyzzy zany
 \endfish
 
 \fish
-echo \a | string escape
+echo \x07 | string escape
 # Output:
 # \cg
 \endfish
@@ -138,6 +138,10 @@ echo 'ok?' | string match '*\?'
 # Output:
 # ok?
 \endfish
+
+# regex examples
+
+string match -r ...
 
 \fish
 string replace ...

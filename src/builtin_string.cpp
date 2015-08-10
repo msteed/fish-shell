@@ -2,7 +2,6 @@
   Implementation of the string builtin.
 */
 
-// XXX implement string split --left '' ...
 // XXX tests for string split '' ...
 // XXX string replace --regex
 // XXX include what you use
@@ -899,7 +898,7 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    bool split_chars = (*sep == L'\0');
+    std::list<wcstring> splits;
     int seplen = wcslen(sep);
     int nsplit = 0;
     const wchar_t *arg;
@@ -907,35 +906,37 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
     {
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
-            std::list<wcstring> splits;
-            const wchar_t *end = arg + wcslen(arg);
-            const wchar_t *cur = end - (split_chars ? 1 : seplen);
-            while (((split_chars && cur > arg) || (!split_chars && cur >= arg)) &&
-                   (max == 0 || nsplit < max))
+            if (seplen == 0)
             {
-                if (split_chars || wcsncmp(cur, sep, seplen) == 0)
+                // Split to individual characters
+                const wchar_t *cur = arg + wcslen(arg) - 1;
+                while (cur > arg && (max == 0 || nsplit < max))
                 {
-                    splits.push_front(wcstring(cur + seplen, end - cur - seplen).c_str());
-                    end = cur;
-                    nsplit++;
-                    cur -= split_chars ? 1 : seplen;
-                }
-                else
-                {
+                    splits.push_front(wcstring(cur, 1));
                     cur--;
+                    nsplit++;
                 }
+                splits.push_front(wcstring(arg, cur - arg + 1));
             }
-            splits.push_front(wcstring(arg, end - arg).c_str());
-
-            std::list<wcstring>::const_iterator si = splits.begin();
-            while (si != splits.end())
+            else
             {
-                if (!quiet)
+                const wchar_t *end = arg + wcslen(arg);
+                const wchar_t *cur = end - seplen;
+                while (cur >= arg && (max == 0 || nsplit < max))
                 {
-                    stdout_buffer += *si;
-                    stdout_buffer += L'\n';
+                    if (wcsncmp(cur, sep, seplen) == 0)
+                    {
+                        splits.push_front(wcstring(cur + seplen, end - cur - seplen));
+                        end = cur;
+                        cur -= seplen;
+                        nsplit++;
+                    }
+                    else
+                    {
+                        cur--;
+                    }
                 }
-                si++;
+                splits.push_front(wcstring(arg, end - arg));
             }
         }
     }
@@ -944,29 +945,47 @@ static int string_split(parser_t &parser, int argc, wchar_t **argv)
         while ((arg = string_get_arg(&i, argv)) != 0)
         {
             const wchar_t *cur = arg;
-            while (cur != 0)
+            if (seplen == 0)
             {
-                const wchar_t *ptr = (seplen == 0 || (max > 0 && nsplit >= max)) ? 0 : wcsstr(cur, sep);
-                if (ptr == 0)
+                // Split to individual characters
+                const wchar_t *last = arg + wcslen(arg) - 1;
+                while (cur < last && (max == 0 || nsplit < max))
                 {
-                    if (!quiet)
-                    {
-                        stdout_buffer += cur;
-                        stdout_buffer += L'\n';
-                    }
-                    cur = 0;
-                }
-                else
-                {
-                    if (!quiet)
-                    {
-                        stdout_buffer += wcstring(cur, ptr - cur);
-                        stdout_buffer += L'\n';
-                    }
-                    cur = ptr + seplen;
+                    splits.push_back(wcstring(cur, 1));
+                    cur++;
                     nsplit++;
                 }
+                splits.push_back(cur);
             }
+            else
+            {
+                while (cur != 0)
+                {
+                    const wchar_t *ptr = (max > 0 && nsplit >= max) ? 0 : wcsstr(cur, sep);
+                    if (ptr == 0)
+                    {
+                        splits.push_back(cur);
+                        cur = 0;
+                    }
+                    else
+                    {
+                        splits.push_back(wcstring(cur, ptr - cur));
+                        cur = ptr + seplen;
+                        nsplit++;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!quiet)
+    {
+        std::list<wcstring>::const_iterator si = splits.begin();
+        while (si != splits.end())
+        {
+            stdout_buffer += *si;
+            stdout_buffer += L'\n';
+            si++;
         }
     }
 
