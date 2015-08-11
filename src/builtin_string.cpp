@@ -21,7 +21,7 @@
 #endif
 #include "pcre2.h"
 
-#define MAX_REPLACE_SIZE 1048576  // pcre2_substitute maximum output buffer size in wchar_t
+#define MAX_REPLACE_SIZE size_t(1048576)  // pcre2_substitute maximum output size in wchar_t
 
 enum
 {
@@ -897,8 +897,8 @@ public:
             {
                 if (outlen < MAX_REPLACE_SIZE)
                 {
-                    outlen *= 2;
-                    output = (wchar_t *)realloc(output, outlen);
+                    outlen = std::max(2 * outlen, MAX_REPLACE_SIZE);
+                    output = (wchar_t *)realloc(output, sizeof(wchar_t) * outlen);
                     if (output == 0)
                     {
                         DIE_MEM();
