@@ -3,6 +3,12 @@
 */
 
 // XXX include what you use
+// XXX review code checking for
+//     - XXX
+//     - error handling
+//     - missing tests
+//     - resource leaks
+//     - style
 // XXX docs
 //  - review for completeness & correctness
 //  - check formatting
@@ -14,6 +20,8 @@
 #define PCRE2_STATIC
 #endif
 #include "pcre2.h"
+
+#define MAX_REPLACE_SIZE 1048576  // pcre2_substitute maximum output buffer size in wchar_t
 
 enum
 {
@@ -461,19 +469,19 @@ public:
         : string_matcher_t(argv0_, opts_),
           regex(0), match(0)
     {
-        int err_code = 0;
-        PCRE2_SIZE err_offset = 0;
-
         // Disable some sequences that can lead to security problems
-        uint32_t pcre2_options = PCRE2_NEVER_UTF;
+        uint32_t options = PCRE2_NEVER_UTF;
 #if PCRE2_CODE_UNIT_WIDTH < 32
         options |= PCRE2_NEVER_BACKSLASH_C;
 #endif
 
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+
         regex = pcre2_compile(
             PCRE2_SPTR(pattern),
             PCRE2_ZERO_TERMINATED,
-            pcre2_options | (opts.ignore_case ? PCRE2_CASELESS : 0),
+            options | (opts.ignore_case ? PCRE2_CASELESS : 0),
             &err_code,
             &err_offset,
             0);
@@ -797,21 +805,21 @@ public:
     regex_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern,
                       const wchar_t *replacement_)
         : string_replacer_t(argv0_, opts_),
-          regex(0), replacement(replacement_)
+          regex(0), match(0), replacement(replacement_)
     {
-        int err_code = 0;
-        PCRE2_SIZE err_offset = 0;
-
         // Disable some sequences that can lead to security problems
-        uint32_t pcre2_options = PCRE2_NEVER_UTF;
+        uint32_t options = PCRE2_NEVER_UTF;
 #if PCRE2_CODE_UNIT_WIDTH < 32
         options |= PCRE2_NEVER_BACKSLASH_C;
 #endif
 
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+
         regex = pcre2_compile(
             PCRE2_SPTR(pattern),
             PCRE2_ZERO_TERMINATED,
-            pcre2_options | (opts.ignore_case ? PCRE2_CASELESS : 0),
+            options | (opts.ignore_case ? PCRE2_CASELESS : 0),
             &err_code,
             &err_offset,
             0);
@@ -829,10 +837,22 @@ public:
         }
     }
 
+    ~regex_replacer_t()
+    {
+        if (match != 0)
+        {
+            pcre2_match_data_free(match);
+        }
+        if (regex != 0)
+        {
+            pcre2_code_free(regex);
+        }
+    }
+
     bool replace_matches(const wchar_t *arg)
     {
-        // A return value of true means all is well (even if no matches were
-        // found), false indicates an unrecoverable error.
+        // A return value of true means all is well (even if no replacements
+        // were performed), false indicates an unrecoverable error.
         if (regex == 0)
         {
             // pcre2_compile() failed
@@ -841,38 +861,63 @@ public:
 
         if (!opts.all && nreplace > 0)
         {
+            if (!opts.quiet)
+            {
+                stdout_buffer += arg;
+                stdout_buffer += L'\n';
+            }
             return true;
         }
 
-        uint32_t options = opts.all ? PCRE2_SUBSTITUTE_GLOBAL : 0; // XXX
+        uint32_t options = opts.all ? PCRE2_SUBSTITUTE_GLOBAL : 0;
         int arglen = wcslen(arg);
-        PCRE2_SIZE outlen = 2 * wcslen(arg);
+        PCRE2_SIZE outlen = (arglen == 0) ? 16 : 2 * arglen;
         wchar_t *output = (wchar_t *)malloc(sizeof(wchar_t) * outlen);
-        int rc = -1;
-        while (rc < 0)
+        if (output == 0)
         {
-            rc = pcre2_substitute(regex, PCRE2_SPTR(arg), arglen, 0, options, 0, 0, 
-                    PCRE2_SPTR(replacement), PCRE2_ZERO_TERMINATED, (PCRE2_UCHAR *)output, &outlen);
+            DIE_MEM();
+        }
+        int rc = 0;
+        for (;;)
+        {
+            rc = pcre2_substitute(
+                    regex,
+                    PCRE2_SPTR(arg),
+                    arglen,
+                    0,  // start offset
+                    options,
+                    match,
+                    0,  // match context
+                    PCRE2_SPTR(replacement),
+                    PCRE2_ZERO_TERMINATED,
+                    (PCRE2_UCHAR *)output,
+                    &outlen);
+
             if (rc == PCRE2_ERROR_NOMEMORY)
             {
-                outlen *= 2; // XXX how to limit this?
-                // XXX does outlen indicate the required size in this case?
-                output = (wchar_t *)realloc(output, outlen);
+                if (outlen < MAX_REPLACE_SIZE)
+                {
+                    outlen *= 2;
+                    output = (wchar_t *)realloc(output, outlen);
+                    if (output == 0)
+                    {
+                        DIE_MEM();
+                    }
+                    continue;
+                }
+                string_fatal_error(_(L"%ls: Replacement string too large"), argv0);
+                return false;
             }
+            break;
         }
         if (rc == PCRE2_ERROR_BADREPLACEMENT)
         {
-            string_fatal_error(_(L"%ls: Bad regular expression replacement"));
-            return false;
-        }
-        if (rc == PCRE2_ERROR_NOMEMORY)
-        {
-            string_fatal_error(_(L"%ls: Replacement string too large")); // XXX
+            string_fatal_error(_(L"%ls: Invalid use of $ in replacement string"), argv0);
             return false;
         }
         if (rc < 0)
         {
-            string_fatal_error(_(L"%ls: Regular expression internal error")); // XXX
+            string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, rc);
             return false;
         }
 

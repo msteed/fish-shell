@@ -4079,7 +4079,29 @@ static void test_string(void)
         { {L"string", L"replace", L"-a", L"***", L"_", L"*****", 0},        0, L"_**\n" },
         { {L"string", L"replace", L"-a", L"***", L"***", L"******", 0},     0, L"******\n" },
 
-        // XXX string replace -r ...
+        { {L"string", L"replace", L"-r", 0},                                1, L"" },
+        { {L"string", L"replace", L"-r", L"", 0},                           1, L"" },
+        { {L"string", L"replace", L"-r", L"", L"", 0},                      1, L"" },
+        { {L"string", L"replace", L"-r", L"", L"", L"", 0},                 0, L"\n" },  // pcre2 behavior
+        { {L"string", L"replace", L"-r", L"", L"", L" ", 0},                0, L" \n" }, // pcre2 behavior
+        { {L"string", L"replace", L"-r", L"a", L"b", L"", 0},               1, L"\n" },
+        { {L"string", L"replace", L"-r", L"a", L"b", L"a", 0},              0, L"b\n" },
+        { {L"string", L"replace", L"-r", L".", L"x", L"abc", 0},            0, L"xbc\n" },
+        { {L"string", L"replace", L"-r", L".", L"", L"abc", 0},             0, L"bc\n" },
+        { {L"string", L"replace", L"-r", L"(\\w)(\\w)", L"$2$1", L"ab", 0}, 0, L"ba\n" },
+        { {L"string", L"replace", L"-r", L"(\\w)", L"$1$1", L"ab", 0},      0, L"aab\n" },
+        { {L"string", L"replace", L"-r", L"-a", L".", L"x", L"abc", 0},     0, L"xxx\n" },
+        { {L"string", L"replace", L"-r", L"-a", L"(\\w)", L"$1$1", L"ab", 0}, 0, L"aabb\n" },
+        { {L"string", L"replace", L"-r", L"-a", L".", L"", L"abc", 0},      0, L"\n" },
+        { {L"string", L"replace", L"-r", L"a", L"x", L"bc", L"cd", L"de", 0}, 1, L"bc\ncd\nde\n" },
+        { {L"string", L"replace", L"-r", L"a", L"x", L"bc", L"ca", L"ab", 0}, 0, L"bc\ncx\nab\n" },
+        { {L"string", L"replace", L"-r", L"-a", L"a", L"x", L"bc", L"ca", L"ab", 0}, 0, L"bc\ncx\nxb\n" },
+        { {L"string", L"replace", L"-r", L"-i", L"A", L"b", L"xax", 0},     0, L"xbx\n" },
+        { {L"string", L"replace", L"-r", L"-i", L"[a-z]", L".", L"1A2B", 0}, 0, L"1.2B\n" },
+        { {L"string", L"replace", L"-r", L"A", L"b", L"xax", 0},            1, L"xax\n" },
+        { {L"string", L"replace", L"-r", L"a", L"$1", L"a", 0},             1, L"" },
+        { {L"string", L"replace", L"-r", L"(a)", L"$2", L"a", 0},           1, L"" },
+        { {L"string", L"replace", L"-r", L"*", L".", L"a", 0},              1, L"" },
 
         { {L"string", L"split", 0},                                         1, L"" },
         { {L"string", L"split", L":", 0},                                   1, L"" },
