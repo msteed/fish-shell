@@ -2,13 +2,12 @@
   Implementation of the string builtin.
 */
 
-// XXX tests for string split '' ...
-// XXX string replace --regex
 // XXX include what you use
 // XXX docs
 //  - review for completeness & correctness
 //  - check formatting
 //  - does help work as expected?
+// XXX copyright notice - pcre2
 
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #ifdef _WIN32
@@ -296,12 +295,12 @@ static int string_length(parser_t &parser, int argc, wchar_t **argv)
 
 struct match_options_t
 {
+    bool all;
     bool ignore_case;
     bool index;
     bool quiet;
-    int max;
 
-    match_options_t(): ignore_case(false), index(false), quiet(false), max(0) { }
+    match_options_t(): all(false), ignore_case(false), index(false), quiet(false) { }
 };
 
 class string_matcher_t
@@ -427,7 +426,7 @@ public:
 
     bool report_matches(const wchar_t *arg)
     {
-        if (opts.max == 0 || nmatch < opts.max)
+        if (opts.all || nmatch == 0)
         {
             bool match = arg_matches(pattern, arg);
             if (match)
@@ -556,7 +555,7 @@ public:
             return false;
         }
 
-        if (opts.max > 0 && nmatch >= opts.max)
+        if (!opts.all && nmatch > 0)
         {
             return true;
         }
@@ -578,7 +577,7 @@ public:
 
         // Report any additional matches
         PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-        while (opts.max == 0 || nmatch < opts.max)
+        while (opts.all || nmatch == 0)
         {
             uint32_t options = 0;
             PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
@@ -620,12 +619,12 @@ public:
 
 static int string_match(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L"im:nqr";
+    const wchar_t *short_options = L"ainqr";
     const struct woption long_options[] =
     {
+        { L"all", no_argument, 0, 'a'},
         { L"ignore-case", no_argument, 0, 'i'},
         { L"index", no_argument, 0, 'n'},
-        { L"max", required_argument, 0, 'm'},
         { L"quiet", no_argument, 0, 'q'},
         { L"regex", no_argument, 0, 'r'},
         { 0, 0, 0, 0 }
@@ -647,12 +646,12 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
             case 0:
                 break;
 
-            case 'i':
-                opts.ignore_case = true;
+            case 'a':
+                opts.all = true;
                 break;
 
-            case 'm':
-                opts.max = int(wcstol(w.woptarg, 0, 10));
+            case 'i':
+                opts.ignore_case = true;
                 break;
 
             case 'n':
@@ -712,21 +711,213 @@ static int string_match(parser_t &parser, int argc, wchar_t **argv)
     return rc;
 }
 
+struct replace_options_t
+{
+    bool all;
+    bool ignore_case;
+    bool quiet;
+
+    replace_options_t(): all(false), ignore_case(false), quiet(false) { }
+};
+
+class string_replacer_t
+{
+protected:
+    replace_options_t opts;
+    const wchar_t *argv0;
+    int nreplace;
+
+public:
+    string_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_)
+        : opts(opts_), argv0(argv0_), nreplace(0)
+    { }
+
+    virtual ~string_replacer_t() {}
+    virtual bool replace_matches(const wchar_t *arg) = 0;
+    int replace_count() { return nreplace; }
+};
+
+class literal_replacer_t: public string_replacer_t
+{
+    const wchar_t *pattern;
+    const wchar_t *replacement;
+    int patlen;
+
+public:
+    literal_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern_,
+                        const wchar_t *replacement_)
+        : string_replacer_t(argv0_, opts_),
+          pattern(pattern_),
+          replacement(replacement_),
+          patlen(wcslen(pattern))
+    { }
+
+    bool replace_matches(const wchar_t *arg)
+    {
+        wcstring replaced;
+        if (patlen == 0)
+        {
+            replaced = arg;
+        }
+        else
+        {
+            const wchar_t *cur = arg;
+            while (*cur != L'\0')
+            {
+                if ((opts.all || nreplace == 0) &&
+                    (opts.ignore_case ? wcsncasecmp(cur, pattern, patlen) : wcsncmp(cur, pattern, patlen)) == 0)
+                {
+                    replaced += replacement;
+                    cur += patlen;
+                    nreplace++;
+                }
+                else
+                {
+                    replaced += *cur;
+                    cur++;
+                }
+            }
+        }
+        if (!opts.quiet)
+        {
+            stdout_buffer += replaced;
+            stdout_buffer += L'\n';
+        }
+        return true;
+    }
+};
+
+class regex_replacer_t: public string_replacer_t
+{
+    pcre2_code *regex;
+    pcre2_match_data *match;
+    const wchar_t *replacement;
+
+public:
+    regex_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern_,
+                      const wchar_t *replacement_)
+        : string_replacer_t(argv0_, opts_),
+          regex(0), replacement(replacement_)
+    {
+#if 0
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+
+        // Disable some sequences that can lead to security problems
+        uint32_t pcre2_options = PCRE2_NEVER_UTF;
+#if PCRE2_CODE_UNIT_WIDTH < 32
+        options |= PCRE2_NEVER_BACKSLASH_C;
+#endif
+
+        regex = pcre2_compile(
+            PCRE2_SPTR(pattern),
+            PCRE2_ZERO_TERMINATED,
+            pcre2_options | (opts.ignore_case ? PCRE2_CASELESS : 0),
+            &err_code,
+            &err_offset,
+            0);
+        if (regex == 0)
+        {
+            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
+                argv0, int(err_offset));
+            return;
+        }
+
+        match = pcre2_match_data_create_from_pattern(regex, 0);
+        if (match == 0)
+        {
+            DIE_MEM();
+        }
+#endif
+    }
+
+    bool replace_matches(const wchar_t *arg)
+    {
+#if 0
+        // A return value of true means all is well (even if no matches were
+        // found), false indicates an unrecoverable error.
+        if (regex == 0)
+        {
+            // pcre2_compile() failed
+            return false;
+        }
+
+        if (!opts.all && nreplace > 0)
+        {
+            return true;
+        }
+
+        // See pcre2demo.c for an explanation of this logic
+        PCRE2_SIZE arglen = wcslen(arg);
+        int rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, 0, 0, match, 0));
+        if (rc < 0)
+        {
+            // pcre2 match error
+            return false;
+        }
+        if (rc == 0)
+        {
+            // no match
+            return true;
+        }
+        nreplace++;
+
+        // Report any additional matches
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+        while (opts.all || nreplace == 0)
+        {
+            uint32_t options = 0;
+            PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
+            PCRE2_SIZE old_offset = pcre2_get_startchar(match);
+            if (offset <= old_offset)
+            {
+                offset = old_offset + 1;
+            }
+
+            if (ovector[0] == ovector[1])
+            {
+                if (ovector[0] == arglen)
+                {
+                    break;
+                }
+                options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
+            }
+
+            rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, offset, options, match, 0));
+            if (rc < 0)
+            {
+                return false;
+            }
+            if (rc == 0)
+            {
+                if (options == 0)
+                {
+                    // All matches found
+                    break;
+                }
+                ovector[1] = offset + 1;
+                continue;
+            }
+            nreplace++;
+        }
+#endif
+        return true;
+    }
+};
+
 static int string_replace(parser_t &parser, int argc, wchar_t **argv)
 {
-    const wchar_t *short_options = L":im:qr";
+    const wchar_t *short_options = L"aiqr";
     const struct woption long_options[] =
     {
-        { L"ignore-case", required_argument, 0, 'i'},
-        { L"max", required_argument, 0, 'm'},
+        { L"all", no_argument, 0, 'a'},
+        { L"ignore-case", no_argument, 0, 'i'},
         { L"quiet", no_argument, 0, 'q'},
         { L"regex", no_argument, 0, 'r'},
         { 0, 0, 0, 0 }
     };
 
-    int max = 0;
-    bool ignore_case = false;
-    bool quiet = false;
+    replace_options_t opts;
     bool regex = false;
     wgetopter_t w;
     for (;;)
@@ -742,16 +933,16 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
             case 0:
                 break;
 
-            case 'i':
-                ignore_case = true;
+            case 'a':
+                opts.all = true;
                 break;
 
-            case 'm':
-                max = int(wcstol(w.woptarg, 0, 10));
+            case 'i':
+                opts.ignore_case = true;
                 break;
 
             case 'q':
-                quiet = true;
+                opts.quiet = true;
                 break;
 
             case 'r':
@@ -787,51 +978,29 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    int nreplace = 0;
-    const wchar_t *arg;
+    string_replacer_t *replacer;
     if (regex)
     {
-        string_fatal_error(L"string replace --regex: Not yet implemented");
-        return BUILTIN_STRING_ERROR;
+        replacer = new regex_replacer_t(argv[0], opts, pattern, replacement);
     }
     else
     {
-        int patlen = wcslen(pattern);
-        while ((arg = string_get_arg(&i, argv)) != 0)
+        replacer = new literal_replacer_t(argv[0], opts, pattern, replacement);
+    }
+
+    const wchar_t *arg;
+    while ((arg = string_get_arg(&i, argv)) != 0)
+    {
+        if (!replacer->replace_matches(arg))
         {
-            wcstring replaced;
-            if (patlen == 0)
-            {
-                replaced = arg;
-            }
-            else
-            {
-                const wchar_t *cur = arg;
-                while (*cur != L'\0')
-                {
-                    if ((max == 0 || nreplace < max) &&
-                        (ignore_case ? wcsncasecmp(cur, pattern, patlen) : wcsncmp(cur, pattern, patlen)) == 0)
-                    {
-                        replaced += replacement;
-                        cur += patlen;
-                        nreplace++;
-                    }
-                    else
-                    {
-                        replaced += *cur;
-                        cur++;
-                    }
-                }
-            }
-            if (!quiet)
-            {
-                stdout_buffer += replaced;
-                stdout_buffer += L'\n';
-            }
+            delete replacer;
+            return BUILTIN_STRING_ERROR;
         }
     }
 
-    return (nreplace > 0) ? 0 : 1;
+    int rc = replacer->replace_count() > 0 ? 0 : 1;
+    delete replacer;
+    return rc;
 }
 
 static int string_split(parser_t &parser, int argc, wchar_t **argv)
@@ -998,7 +1167,7 @@ static int string_sub(parser_t &parser, int argc, wchar_t **argv)
     const struct woption long_options[] =
     {
         { L"length", required_argument, 0, 'l'},
-        { L"quiet", required_argument, 0, 'q'},
+        { L"quiet", no_argument, 0, 'q'},
         { L"start", required_argument, 0, 's'},
         { 0, 0, 0, 0 }
     };
