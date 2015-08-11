@@ -2,12 +2,7 @@
   Implementation of the string builtin.
 */
 
-// XXX include what you use
-// XXX review code checking for
-//     - error handling
-//     - missing tests
-//     - resource leaks
-//     - style
+// XXX missing tests?
 // XXX docs
 //  - review for completeness & correctness
 //  - check formatting
@@ -68,12 +63,12 @@ static const wchar_t *string_get_arg_stdin()
                 size_t n = mbrtowc(&wch, &ch, 1, &state);
                 if (n == size_t(-1))
                 {
-                    // Invalid multibyte sequence, start over
+                    // Invalid multibyte sequence: start over
                     memset(&state, 0, sizeof(state));
                 }
                 else if (n == size_t(-2))
                 {
-                    // Incomplete sequence, continue reading
+                    // Incomplete sequence: continue reading
                 }
                 else
                 {
@@ -218,7 +213,7 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
         return BUILTIN_STRING_ERROR;
     }
 
-    int njoin = 0;
+    int nargs = 0;
     const wchar_t *arg;
     while ((arg = string_get_arg(&i, argv)) != 0)
     {
@@ -227,15 +222,15 @@ static int string_join(parser_t &parser, int argc, wchar_t **argv)
             stdout_buffer += arg;
             stdout_buffer += sep;
         }
-        njoin++;
+        nargs++;
     }
-    if (njoin > 0 && !quiet)
+    if (nargs > 0 && !quiet)
     {
         stdout_buffer.resize(stdout_buffer.length() - wcslen(sep));
         stdout_buffer += L'\n';
     }
 
-    return (njoin > 0) ? 0 : 1;
+    return (nargs > 1) ? 0 : 1;
 }
 
 static int string_length(parser_t &parser, int argc, wchar_t **argv)
@@ -320,7 +315,7 @@ public:
         : opts(opts_), argv0(argv0_), nmatch(0)
     { }
 
-    virtual ~string_matcher_t() {}
+    virtual ~string_matcher_t() { }
     virtual bool report_matches(const wchar_t *arg) = 0;
     int match_count() { return nmatch; }
 };
@@ -328,12 +323,6 @@ public:
 class wildcard_matcher_t: public string_matcher_t
 {
     const wchar_t *pattern;
-
-public:
-    wildcard_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern_)
-        : string_matcher_t(argv0_, opts_),
-          pattern(pattern_)
-    { }
 
     bool arg_matches(const wchar_t *pat, const wchar_t *arg)
     {
@@ -429,6 +418,14 @@ public:
         return *pat == L'\0';
     }
 
+public:
+    wildcard_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern_)
+        : string_matcher_t(argv0_, opts_),
+          pattern(pattern_)
+    { }
+
+    virtual ~wildcard_matcher_t() { }
+
     bool report_matches(const wchar_t *arg)
     {
         if (opts.all || nmatch == 0)
@@ -461,55 +458,9 @@ class pcre2_matcher_t: public string_matcher_t
     pcre2_code *regex;
     pcre2_match_data *match;
 
-public:
-    pcre2_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern)
-        : string_matcher_t(argv0_, opts_),
-          regex(0), match(0)
-    {
-        // Disable some sequences that can lead to security problems
-        uint32_t options = PCRE2_NEVER_UTF;
-#if PCRE2_CODE_UNIT_WIDTH < 32
-        options |= PCRE2_NEVER_BACKSLASH_C;
-#endif
-
-        int err_code = 0;
-        PCRE2_SIZE err_offset = 0;
-
-        regex = pcre2_compile(
-            PCRE2_SPTR(pattern),
-            PCRE2_ZERO_TERMINATED,
-            options | (opts.ignore_case ? PCRE2_CASELESS : 0),
-            &err_code,
-            &err_offset,
-            0);
-        if (regex == 0)
-        {
-            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
-                argv0, int(err_offset));
-            return;
-        }
-
-        match = pcre2_match_data_create_from_pattern(regex, 0);
-        if (match == 0)
-        {
-            DIE_MEM();
-        }
-    }
-
-    ~pcre2_matcher_t()
-    {
-        if (match != 0)
-        {
-            pcre2_match_data_free(match);
-        }
-        if (regex != 0)
-        {
-            pcre2_code_free(regex);
-        }
-    }
-
     int report_match(const wchar_t *arg, int pcre2_rc)
     {
+        // Return values: -1 = error, 0 = no match, 1 = match
         if (pcre2_rc == PCRE2_ERROR_NOMATCH)
         {
             return 0;
@@ -548,6 +499,53 @@ public:
             }
         }
         return 1;
+    }
+
+public:
+    pcre2_matcher_t(const wchar_t *argv0_, const match_options_t &opts_, const wchar_t *pattern)
+        : string_matcher_t(argv0_, opts_),
+          regex(0), match(0)
+    {
+        // Disable some sequences that can lead to security problems
+        uint32_t options = PCRE2_NEVER_UTF;
+#if PCRE2_CODE_UNIT_WIDTH < 32
+        options |= PCRE2_NEVER_BACKSLASH_C;
+#endif
+
+        int err_code = 0;
+        PCRE2_SIZE err_offset = 0;
+
+        regex = pcre2_compile(
+            PCRE2_SPTR(pattern),
+            PCRE2_ZERO_TERMINATED,
+            options | (opts.ignore_case ? PCRE2_CASELESS : 0),
+            &err_code,
+            &err_offset,
+            0);
+        if (regex == 0)
+        {
+            string_fatal_error(_(L"%ls: Regular expression compilation failed at offset %d"),
+                argv0, int(err_offset));
+            return;
+        }
+
+        match = pcre2_match_data_create_from_pattern(regex, 0);
+        if (match == 0)
+        {
+            DIE_MEM();
+        }
+    }
+
+    virtual ~pcre2_matcher_t()
+    {
+        if (match != 0)
+        {
+            pcre2_match_data_free(match);
+        }
+        if (regex != 0)
+        {
+            pcre2_code_free(regex);
+        }
     }
 
     bool report_matches(const wchar_t *arg)
@@ -752,10 +750,10 @@ public:
     literal_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern_,
                         const wchar_t *replacement_)
         : string_replacer_t(argv0_, opts_),
-          pattern(pattern_),
-          replacement(replacement_),
-          patlen(wcslen(pattern))
+          pattern(pattern_), replacement(replacement_), patlen(wcslen(pattern))
     { }
+
+    virtual ~literal_replacer_t() { }
 
     bool replace_matches(const wchar_t *arg)
     {
@@ -834,7 +832,7 @@ public:
         }
     }
 
-    ~regex_replacer_t()
+    virtual ~regex_replacer_t()
     {
         if (match != 0)
         {
@@ -874,23 +872,23 @@ public:
         {
             DIE_MEM();
         }
-        int rc = 0;
+        int pcre2_rc = 0;
         for (;;)
         {
-            rc = pcre2_substitute(
-                    regex,
-                    PCRE2_SPTR(arg),
-                    arglen,
-                    0,  // start offset
-                    options,
-                    match,
-                    0,  // match context
-                    PCRE2_SPTR(replacement),
-                    PCRE2_ZERO_TERMINATED,
-                    (PCRE2_UCHAR *)output,
-                    &outlen);
+            pcre2_rc = pcre2_substitute(
+                            regex,
+                            PCRE2_SPTR(arg),
+                            arglen,
+                            0,  // start offset
+                            options,
+                            match,
+                            0,  // match context
+                            PCRE2_SPTR(replacement),
+                            PCRE2_ZERO_TERMINATED,
+                            (PCRE2_UCHAR *)output,
+                            &outlen);
 
-            if (rc == PCRE2_ERROR_NOMEMORY)
+            if (pcre2_rc == PCRE2_ERROR_NOMEMORY)
             {
                 if (outlen < MAX_REPLACE_SIZE)
                 {
@@ -903,30 +901,35 @@ public:
                     continue;
                 }
                 string_fatal_error(_(L"%ls: Replacement string too large"), argv0);
+                free(output);
                 return false;
             }
             break;
         }
-        if (rc == PCRE2_ERROR_BADREPLACEMENT)
+
+        bool rc = true;
+        if (pcre2_rc == PCRE2_ERROR_BADREPLACEMENT)
         {
             string_fatal_error(_(L"%ls: Invalid use of $ in replacement string"), argv0);
-            return false;
+            rc = false;
         }
-        if (rc < 0)
+        else if (pcre2_rc < 0)
         {
-            string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, rc);
-            return false;
+            string_fatal_error(_(L"%ls: Regular expression match error %d"), argv0, pcre2_rc);
+            rc = false;
+        }
+        else
+        {
+            if (!opts.quiet)
+            {
+                stdout_buffer += output;
+                stdout_buffer += L'\n';
+            }
+            nreplace += pcre2_rc;
         }
 
-        if (!opts.quiet)
-        {
-            stdout_buffer += output;
-            stdout_buffer += L'\n';
-        }
         free(output);
-        nreplace += rc;
-
-        return true;
+        return rc;
     }
 };
 
@@ -973,10 +976,6 @@ static int string_replace(parser_t &parser, int argc, wchar_t **argv)
             case 'r':
                 regex = true;
                 break;
-
-            case ':':
-                string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
-                return BUILTIN_STRING_ERROR;
 
             case '?':
                 builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
@@ -1306,7 +1305,7 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
         { 0, 0, 0, 0 }
     };
 
-    int which = 0;
+    int leftright = 0;
     bool quiet = false;
     wcstring chars = L" \f\n\r\t";
     wgetopter_t w;
@@ -1328,7 +1327,7 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'l':
-                which |= 1;
+                leftright |= 1;
                 break;
 
             case 'q':
@@ -1336,8 +1335,12 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
                 break;
 
             case 'r':
-                which |= 2;
+                leftright |= 2;
                 break;
+
+            case ':':
+                string_fatal_error(BUILTIN_ERR_MISSING, argv[0]);
+                return BUILTIN_STRING_ERROR;
 
             case '?':
                 builtin_unknown_option(parser, argv[0], argv[w.woptind - 1]);
@@ -1358,7 +1361,7 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
     {
         const wchar_t *begin = arg;
         const wchar_t *end = arg + wcslen(arg);
-        if (!which || (which & 1))
+        if (!leftright || (leftright & 1))
         {
             while (begin != end && chars.find_first_of(begin, 0, 1) != wcstring::npos)
             {
@@ -1366,7 +1369,7 @@ static int string_trim(parser_t &parser, int argc, wchar_t **argv)
                 ntrim++;
             }
         }
-        if (!which || (which & 2))
+        if (!leftright || (leftright & 2))
         {
             while (begin != end && chars.find_first_of(end - 1, 0, 1) != wcstring::npos)
             {
