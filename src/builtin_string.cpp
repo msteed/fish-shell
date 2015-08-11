@@ -794,12 +794,11 @@ class regex_replacer_t: public string_replacer_t
     const wchar_t *replacement;
 
 public:
-    regex_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern_,
+    regex_replacer_t(const wchar_t *argv0_, const replace_options_t &opts_, const wchar_t *pattern,
                       const wchar_t *replacement_)
         : string_replacer_t(argv0_, opts_),
           regex(0), replacement(replacement_)
     {
-#if 0
         int err_code = 0;
         PCRE2_SIZE err_offset = 0;
 
@@ -828,12 +827,10 @@ public:
         {
             DIE_MEM();
         }
-#endif
     }
 
     bool replace_matches(const wchar_t *arg)
     {
-#if 0
         // A return value of true means all is well (even if no matches were
         // found), false indicates an unrecoverable error.
         if (regex == 0)
@@ -847,60 +844,46 @@ public:
             return true;
         }
 
-        // See pcre2demo.c for an explanation of this logic
-        PCRE2_SIZE arglen = wcslen(arg);
-        int rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, 0, 0, match, 0));
-        if (rc < 0)
+        uint32_t options = opts.all ? PCRE2_SUBSTITUTE_GLOBAL : 0; // XXX
+        int arglen = wcslen(arg);
+        PCRE2_SIZE outlen = 2 * wcslen(arg);
+        wchar_t *output = (wchar_t *)malloc(sizeof(wchar_t) * outlen);
+        int rc = -1;
+        while (rc < 0)
         {
-            // pcre2 match error
+            rc = pcre2_substitute(regex, PCRE2_SPTR(arg), arglen, 0, options, 0, 0, 
+                    PCRE2_SPTR(replacement), PCRE2_ZERO_TERMINATED, (PCRE2_UCHAR *)output, &outlen);
+            if (rc == PCRE2_ERROR_NOMEMORY)
+            {
+                outlen *= 2; // XXX how to limit this?
+                // XXX does outlen indicate the required size in this case?
+                output = (wchar_t *)realloc(output, outlen);
+            }
+        }
+        if (rc == PCRE2_ERROR_BADREPLACEMENT)
+        {
+            string_fatal_error(_(L"%ls: Bad regular expression replacement"));
             return false;
         }
-        if (rc == 0)
+        if (rc == PCRE2_ERROR_NOMEMORY)
         {
-            // no match
-            return true;
+            string_fatal_error(_(L"%ls: Replacement string too large")); // XXX
+            return false;
         }
-        nreplace++;
-
-        // Report any additional matches
-        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
-        while (opts.all || nreplace == 0)
+        if (rc < 0)
         {
-            uint32_t options = 0;
-            PCRE2_SIZE offset = ovector[1]; // Start at end of previous match
-            PCRE2_SIZE old_offset = pcre2_get_startchar(match);
-            if (offset <= old_offset)
-            {
-                offset = old_offset + 1;
-            }
-
-            if (ovector[0] == ovector[1])
-            {
-                if (ovector[0] == arglen)
-                {
-                    break;
-                }
-                options = PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED;
-            }
-
-            rc = report_match(arg, pcre2_match(regex, PCRE2_SPTR(arg), arglen, offset, options, match, 0));
-            if (rc < 0)
-            {
-                return false;
-            }
-            if (rc == 0)
-            {
-                if (options == 0)
-                {
-                    // All matches found
-                    break;
-                }
-                ovector[1] = offset + 1;
-                continue;
-            }
-            nreplace++;
+            string_fatal_error(_(L"%ls: Regular expression internal error")); // XXX
+            return false;
         }
-#endif
+
+        if (!opts.quiet)
+        {
+            stdout_buffer += output;
+            stdout_buffer += L'\n';
+        }
+        free(output);
+        nreplace += rc;
+
         return true;
     }
 };
