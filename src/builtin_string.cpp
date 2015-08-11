@@ -4,7 +4,6 @@
 
 // XXX include what you use
 // XXX review code checking for
-//     - XXX
 //     - error handling
 //     - missing tests
 //     - resource leaks
@@ -13,7 +12,6 @@
 //  - review for completeness & correctness
 //  - check formatting
 //  - does help work as expected?
-// XXX copyright notice - pcre2
 
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #ifdef _WIN32
@@ -70,17 +68,16 @@ static const wchar_t *string_get_arg_stdin()
                 size_t n = mbrtowc(&wch, &ch, 1, &state);
                 if (n == size_t(-1))
                 {
-                    // invalid multibyte sequence
-                    // XXX communicate error to caller
+                    // Invalid multibyte sequence, start over
                     memset(&state, 0, sizeof(state));
                 }
                 else if (n == size_t(-2))
                 {
-                    // incomplete sequence, continue reading
+                    // Incomplete sequence, continue reading
                 }
                 else
                 {
-                    // got a complete char (could be L'\0')
+                    // Got a complete char (could be L'\0')
                     break;
                 }
             }
