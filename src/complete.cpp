@@ -58,35 +58,6 @@
 #define COMPLETE_VAR_DESC_VAL _( L"Variable: %ls" )
 
 /**
-   The maximum number of commands on which to perform description
-   lookup. The lookup process is quite time consuming, so this should
-   be set to a pretty low number.
-*/
-#define MAX_CMD_DESC_LOOKUP 10
-
-/**
-   Condition cache value returned from hashtable when this condition
-   has not yet been tested. This value is NULL, so that when the hash
-   table returns NULL, this wil be seen as an untested condition.
-*/
-#define CC_NOT_TESTED 0
-
-/**
-   Condition cache value returned from hashtable when the condition is
-   met. This can be any value, that is a valid pointer, and that is
-   different from CC_NOT_TESTED and CC_FALSE.
-*/
-#define CC_TRUE L"true"
-
-/**
-   Condition cache value returned from hashtable when the condition is
-   not met. This can be any value, that is a valid pointer, and that
-   is different from CC_NOT_TESTED and CC_TRUE.
-
-*/
-#define CC_FALSE L"false"
-
-/**
    The special cased translation macro for completions. The empty
    string needs to be special cased, since it can occur, and should
    not be translated. (Gettext returns the version information as the
@@ -326,6 +297,13 @@ bool completion_t::is_alphabetically_equal_to(const completion_t &a, const compl
     return a.completion == b.completion;
 }
 
+void completion_t::prepend_token_prefix(const wcstring &prefix)
+{
+    if (this->flags & COMPLETE_REPLACES_TOKEN)
+    {
+        this->completion.insert(0, prefix);
+    }
+}
 
 /** Class representing an attempt to compute completions */
 class completer_t
@@ -1133,7 +1111,7 @@ void completer_t::complete_cmd(const wcstring &str_cmd, bool use_function, bool 
     if (use_command)
     {
 
-        if (expand_string(str_cmd, &this->completions, ACCEPT_INCOMPLETE | EXECUTABLES_ONLY | this->expand_flags(), NULL) != EXPAND_ERROR)
+        if (expand_string(str_cmd, &this->completions, EXPAND_FOR_COMPLETIONS | EXECUTABLES_ONLY | this->expand_flags(), NULL) != EXPAND_ERROR)
         {
             if (this->wants_descriptions())
             {
@@ -1143,7 +1121,7 @@ void completer_t::complete_cmd(const wcstring &str_cmd, bool use_function, bool 
     }
     if (use_implicit_cd)
     {
-        if (!expand_string(str_cmd, &this->completions, ACCEPT_INCOMPLETE | DIRECTORIES_ONLY | this->expand_flags(), NULL))
+        if (!expand_string(str_cmd, &this->completions, EXPAND_FOR_COMPLETIONS | DIRECTORIES_ONLY | this->expand_flags(), NULL))
         {
             // Not valid as implicit cd.
         }
@@ -1173,7 +1151,7 @@ void completer_t::complete_cmd(const wcstring &str_cmd, bool use_function, bool 
                     size_t prev_count =  this->completions.size();
                     if (expand_string(nxt_completion,
                                       &this->completions,
-                                      ACCEPT_INCOMPLETE | EXECUTABLES_ONLY | this->expand_flags(), NULL) != EXPAND_ERROR)
+                                      EXPAND_FOR_COMPLETIONS | EXECUTABLES_ONLY | this->expand_flags(), NULL) != EXPAND_ERROR)
                     {
                         /* For all new completions, if COMPLETE_NO_CASE is set, then use only the last path component */
                         for (size_t i=prev_count; i< this->completions.size(); i++)
@@ -1610,7 +1588,7 @@ bool completer_t::complete_param(const wcstring &scmd_orig, const wcstring &spop
 */
 void completer_t::complete_param_expand(const wcstring &str, bool do_file, bool directories_only)
 {
-    expand_flags_t flags = EXPAND_SKIP_CMDSUBST | ACCEPT_INCOMPLETE | this->expand_flags();
+    expand_flags_t flags = EXPAND_SKIP_CMDSUBST | EXPAND_FOR_COMPLETIONS | this->expand_flags();
 
     if (! do_file)
         flags |= EXPAND_SKIP_WILDCARDS;
@@ -1647,15 +1625,11 @@ void completer_t::complete_param_expand(const wcstring &str, bool do_file, bool 
             debug(3, L"Error while expanding string '%ls'", sep_string.c_str());
         }
         
-        /* Hack hack hack. Any COMPLETE_REPLACES_TOKEN will also stomp the separator. We need to "repair" them by inserting our separator and prefix. */
+        /* Any COMPLETE_REPLACES_TOKEN will also stomp the separator. We need to "repair" them by inserting our separator and prefix. */
         const wcstring prefix_with_sep = wcstring(str, 0, sep_index + 1);
         for (size_t i=0; i < local_completions.size(); i++)
         {
-            completion_t *c = &local_completions.at(i);
-            if (c->flags & COMPLETE_REPLACES_TOKEN)
-            {
-                c->completion.insert(0, prefix_with_sep);
-            }
+            local_completions.at(i).prepend_token_prefix(prefix_with_sep);
         }
         this->completions.insert(this->completions.end(),
                                  local_completions.begin(),
