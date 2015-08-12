@@ -67,7 +67,7 @@ string sub -s 2 -l 2 abcde
 # Output:
 # bc
 
-string sub --start -2 abcde
+string sub --start=-2 abcde
 # Output:
 # de
 \endfish
@@ -97,9 +97,9 @@ seq 3 | string join ...
 \endfish
 
 \fish
-string trim ' abc d '
+string trim ' abc  '
 # Output:
-# abc d
+# abc
 
 string trim --right --chars=yz xyzzy zany
 # Output:
@@ -108,9 +108,9 @@ string trim --right --chars=yz xyzzy zany
 \endfish
 
 \fish
-echo \x07 | string escape
+echo \\x07 | string escape
 # Output:
-# \cg
+# \\cg
 \endfish
 
 \fish
@@ -137,7 +137,7 @@ string match '[^fb]*' foo bar baz qux
 # Output:
 # qux
 
-echo 'ok?' | string match '*\?'
+echo 'ok?' | string match '*\\?'
 # Output:
 # ok?
 
@@ -147,14 +147,14 @@ string match -r 'cat|dog|fish' 'nice dog'
 # Output:
 # dog
 
-string match -r '(\d\d?):(\d\d):(\d\d)' 2:34:56
+string match -r '(\\d\\d?):(\\d\\d):(\\d\\d)' 2:34:56
 # Output:
 # 2:34:56
 # 2
 # 34
 # 56
 
-string match -r '^(\w{2,4})\g1$' papa mud murmur
+string match -r '^(\\w{2,4})\\g1$' papa mud murmur
 # Output:
 # papa
 # pa
@@ -190,11 +190,11 @@ string replace -a ' ' _ 'spaces to underscores'
 
 # string replace regex examples
 
-string replace -r -a '[^\d.]+' ' ' '0 one two 3.14 four 5x'
+string replace -r -a '[^\\d.]+' ' ' '0 one two 3.14 four 5x'
 # Output:
 # 0 3.14 5
 
-string replace -r '(\w+)\s+(\w+)' '$1 $2 $1' 'left  right'
+string replace -r '(\\w+)\\s+(\\w+)' '$1 $2 $1' 'left  right'
 # Output:
 # left right left
 \endfish
