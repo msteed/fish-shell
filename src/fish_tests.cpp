@@ -3937,7 +3937,7 @@ static void test_string(void)
 {
     static struct string_test
     {
-        const wchar_t *argv[10];
+        const wchar_t *argv[15];
         int expected_rc;
         const wchar_t *expected_out;
     }
@@ -4022,9 +4022,7 @@ static void test_string(void)
 
         { {L"string", L"match", L"-a", L"*", L"ab", L"cde", 0},             0, L"ab\ncde\n" },
         { {L"string", L"match", L"*", L"ab", L"cde", 0},                    0, L"ab\n" },
-        { {L"string", L"match", L"-a", L"-n", L"a*", L"ab", L"cde", 0},     0, L"1\n0\n" },
-        { {L"string", L"match", L"-n", L"a*", L"ab", L"cde",                0}, 0, L"1\n" },
-        { {L"string", L"match", L"-n", L"c*", L"ab", L"cde",                0}, 0, L"0\n1\n" },
+        { {L"string", L"match", L"-n", L"*d*", L"cde", 0},                  0, L"1\n" },
         { {L"string", L"match", L"-q", L"a*", L"b", L"c", 0},               1, L"" },
         { {L"string", L"match", L"-q", L"a*", L"b", L"a", 0},               0, L"" },
 

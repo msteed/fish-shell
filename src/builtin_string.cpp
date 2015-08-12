@@ -2,12 +2,6 @@
   Implementation of the string builtin.
 */
 
-// XXX missing tests?
-// XXX docs
-//  - review for completeness & correctness
-//  - check formatting
-//  - does help work as expected?
-
 #define PCRE2_CODE_UNIT_WIDTH WCHAR_T_BITS
 #ifdef _WIN32
 #define PCRE2_STATIC
@@ -437,15 +431,17 @@ public:
             }
             if (!opts.quiet)
             {
-                if (opts.index)
+                if (match)
                 {
-                    stdout_buffer += match ? L'1' : L'0';
-                    stdout_buffer += L'\n';
-                }
-                else if (match)
-                {
-                    stdout_buffer += arg;
-                    stdout_buffer += L'\n';
+                    if (opts.index)
+                    {
+                        stdout_buffer += L"1\n";
+                    }
+                    else
+                    {
+                        stdout_buffer += arg;
+                        stdout_buffer += L'\n';
+                    }
                 }
             }
         }
