@@ -1,3 +1,4 @@
+//
 // Functions for executing builtin functions.
 //
 // How to add a new builtin function:
@@ -15,12 +16,12 @@
 // Check the other builtin manuals for proper syntax.
 //
 // 4). Use 'git add doc_src/NAME.txt' to start tracking changes to the documentation file.
-#include "config.h"  // IWYU pragma: keep
 
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
+#include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,25 +32,34 @@
 #include <wctype.h>
 #include <algorithm>
 #include <map>
-#include <stack>
+#include <memory>  // IWYU pragma: keep
 #include <string>
 #include <utility>
 
-#include "fallback.h"  // IWYU pragma: keep
-
 #include "builtin.h"
+#include "builtin_commandline.h"
+#include "builtin_complete.h"
+#include "builtin_jobs.h"
+#include "builtin_printf.h"
+#include "builtin_set.h"
+#include "builtin_set_color.h"
+#include "builtin_string.h"
+#include "builtin_test.h"
+#include "builtin_ulimit.h"
+#include "common.h"
 #include "complete.h"
 #include "env.h"
 #include "event.h"
 #include "exec.h"
 #include "expand.h"
+#include "fallback.h"  // IWYU pragma: keep
 #include "function.h"
 #include "highlight.h"
 #include "history.h"
 #include "input.h"
 #include "intern.h"
+#include "io.h"
 #include "parse_constants.h"
-#include "parse_tree.h"
 #include "parse_util.h"
 #include "parser.h"
 #include "parser_keywords.h"
@@ -60,7 +70,7 @@
 #include "tokenizer.h"
 #include "wcstringutil.h"
 #include "wgetopt.h"
-#include "wutil.h"
+#include "wutil.h"  // IWYU pragma: keep
 
 // The default prompt for the read command.
 #define DEFAULT_READ_PROMPT L"set_color green; echo -n read; set_color normal; echo -n \"> \""
@@ -103,7 +113,7 @@ int builtin_count_args(const wchar_t *const *argv) {
 
 /// This function works like wperror, but it prints its result into the streams.err string instead
 /// to stderr. Used by the builtin commands.
-static void builtin_wperror(const wchar_t *s, io_streams_t &streams) {
+void builtin_wperror(const wchar_t *s, io_streams_t &streams) {
     char *err = strerror(errno);
     if (s != NULL) {
         streams.err.append(s);
@@ -228,20 +238,20 @@ void builtin_print_help(parser_t &parser, io_streams_t &streams, const wchar_t *
 }
 
 /// Perform error reporting for encounter with unknown option.
-static void builtin_unknown_option(parser_t &parser, io_streams_t &streams, const wchar_t *cmd,
-                                   const wchar_t *opt) {
+void builtin_unknown_option(parser_t &parser, io_streams_t &streams, const wchar_t *cmd,
+                            const wchar_t *opt) {
     streams.err.append_format(BUILTIN_ERR_UNKNOWN, cmd, opt);
     builtin_print_help(parser, streams, cmd, streams.err);
 }
 
 /// Perform error reporting for encounter with missing argument.
-static void builtin_missing_argument(parser_t &parser, io_streams_t &streams, const wchar_t *cmd,
-                                     const wchar_t *opt) {
+void builtin_missing_argument(parser_t &parser, io_streams_t &streams, const wchar_t *cmd,
+                              const wchar_t *opt) {
     streams.err.append_format(BUILTIN_ERR_MISSING, cmd, opt);
     builtin_print_help(parser, streams, cmd, streams.err);
 }
 
-// Here follows the definition of all builtin commands. The function names are all on the form
+// Here follows the definition of all builtin commands. The function names are all of the form
 // builtin_NAME where NAME is the name of the builtin. so the function name for the builtin 'fg' is
 // 'builtin_fg'.
 //
@@ -253,21 +263,7 @@ static void builtin_missing_argument(parser_t &parser, io_streams_t &streams, co
 // implementation, namely 'builtin_break_continue.
 //
 // Several other builtins, including jobs, ulimit and set are so big that they have been given their
-// own file. These files are all named 'builtin_NAME.c', where NAME is the name of the builtin.
-// These files are included directly below.
-#include "builtin_commandline.cpp"
-#include "builtin_complete.cpp"
-#include "builtin_jobs.cpp"
-#include "builtin_printf.cpp"
-#include "builtin_set.cpp"
-#include "builtin_set_color.cpp"
-#include "builtin_ulimit.cpp"
-
-// builtin_test lives in builtin_test.cpp
-int builtin_test(parser_t &parser, io_streams_t &streams, wchar_t **argv);
-
-// builtin_string lives in builtin_string.cpp
-int builtin_string(parser_t &parser, io_streams_t &streams, wchar_t **argv);
+// own module. These files are all named 'builtin_NAME.cpp', where NAME is the name of the builtin.
 
 /// List a single key binding.
 /// Returns false if no binding with that sequence and mode exists.
