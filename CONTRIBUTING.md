@@ -70,7 +70,38 @@ make style-all
 
 That command will refuse to restyle any files if you have uncommitted changes.
 
-### Suppressing Reformatting of the Code
+### Configuring Your Editor for Fish C++ Code
+
+#### ViM
+
+As of ViM 7.4 it does not recognize triple-slash comments as used by Doxygen and the OS X Xcode IDE to flag comments that explain the following C symbol. This means the `gq` key binding to reformat such comments doesn't behave as expected. You can fix that by adding the following to your vimrc:
+
+```
+autocmd Filetype c,cpp setlocal comments^=:///
+```
+
+If you use ViM I recommend the [vim-clang-format plugin](https://github.com/rhysd/vim-clang-format) by [@rhysd](https://github.com/rhysd).
+
+You can also get ViM to provide reasonably correct behavior by installing
+
+http://www.vim.org/scripts/script.php?script_id=2636
+
+#### Emacs
+
+If you use Emacs: TBD
+
+### Configuring Your Editor for Fish Scripts
+
+If you use ViM: TBD
+
+If you use Emacs: Install [fish-mode](https://github.com/wwwjfy/emacs-fish) (also available in melpa and melpa-stable) and `(setq-default indent-tabs-mode nil)` for it (via a hook or in `use-package`s ":init" block). It can also be made to run fish_indent via e.g.
+
+```elisp
+(add-hook 'fish-mode-hook (lambda ()
+    (add-hook 'before-save-hook 'fish_indent-before-save)))
+```
+
+### Suppressing Reformatting of C++ Code
 
 If you have a good reason for doing so you can tell `clang-format` to not reformat a block of code by enclosing it in comments like this:
 
@@ -82,11 +113,11 @@ code to ignore
 
 ## Fish Script Style Guide
 
-Fish scripts such as those in the *share/functions* and *tests* directories should be formatted using the `fish_indent` command.
+1. Fish scripts such as those in the *share/functions* and *tests* directories should be formatted using the `fish_indent` command.
 
-Function names should be all lowercase with undescores separating words. Private functions should begin with an underscore. The first word should be `fish` if the function is unique to fish.
+1. Function names should be all lowercase with undescores separating words. Private functions should begin with an underscore. The first word should be `fish` if the function is unique to fish.
 
-The first word of global variable names should generally be `fish` for public vars or `_fish` for private vars to minimize the possibility of name clashes with user defined vars.
+1. The first word of global variable names should generally be `fish` for public vars or `_fish` for private vars to minimize the possibility of name clashes with user defined vars.
 
 ## C++ Style Guide
 
@@ -133,6 +164,43 @@ You will need to [fork the fish-shell repository on GitHub](https://help.github.
 You'll receive an email when the tests are complete telling you whether or not any tests failed.
 
 You'll find the configuration used to control Travis in the `.travis.yml` file.
+
+### Git hooks
+
+Since developers sometimes forget to run the tests, it can be helpful to use git hooks (see githooks(5)) to automate it.
+
+One possibility is a pre-push hook script like this one:
+
+```sh
+#!/bin/sh
+#### A pre-push hook for the fish-shell project
+# This will run the tests when a push to master is detected, and will stop that if the tests fail
+# Save this as .git/hooks/pre-push and make it executable
+
+protected_branch='master'
+
+# Git gives us lines like "refs/heads/frombranch SOMESHA1 refs/heads/tobranch SOMESHA1"
+# We're only interested in the branches
+while read from _ to _; do
+    if [ "x$to" = "xrefs/heads/$protected_branch" ]; then
+        isprotected=1
+    fi
+done
+if [ "x$isprotected" = x1 ]; then
+    echo "Running tests before push to master"
+    make test
+    RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        echo "Tests failed for a push to master, we can't let you do that" >&2
+        exit 1
+    fi
+fi
+exit 0
+```
+
+This will check if the push is to the master branch and, if it is, will run `make test` and only allow the push if that succeeds. In some circumstances it might be advisable to circumvent it with `git push --no-verify`, but usually that should not be necessary.
+
+To install the hook, put it in .git/hooks/pre-push and make it executable.
 
 ## Installing the Required Tools
 

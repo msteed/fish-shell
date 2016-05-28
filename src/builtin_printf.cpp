@@ -48,6 +48,7 @@
 // David MacKenzie <djm@gnu.ai.mit.edu>
 
 // This file has been imported from source code of printf command in GNU Coreutils version 6.9.
+#include "config.h"  // IWYU pragma: keep
 
 #include <errno.h>
 #include <limits.h>
@@ -596,21 +597,24 @@ int builtin_printf_state_t::print_formatted(const wchar_t *format, int argc, wch
                 for (;; f++, direc_length++) {
                     switch (*f) {
                         case L'I':
-                        case L'\'':
+                        case L'\'': {
                             modify_allowed_format_specifiers(ok, "aAceEosxX", false);
                             break;
+                        }
                         case '-':
                         case '+':
-                        case ' ':
+                        case ' ': {
                             break;
-                        case L'#':
+                        }
+                        case L'#': {
                             modify_allowed_format_specifiers(ok, "cdisu", false);
                             break;
-                        case '0':
+                        }
+                        case '0': {
                             modify_allowed_format_specifiers(ok, "cs", false);
                             break;
-                        default:
-                            goto no_more_flag_characters;
+                        }
+                        default: { goto no_more_flag_characters; }
                     }
                 }
             no_more_flag_characters:;
